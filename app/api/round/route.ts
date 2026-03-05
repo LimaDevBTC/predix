@@ -1,6 +1,7 @@
 import { getOrCreateCurrentRound } from '@/lib/rounds'
 import { fetchBtcPriceUsd } from '@/lib/btc-price'
 import { getPriceUp, getPriceDown } from '@/lib/amm'
+import { getOptimisticPool } from '@/lib/pool-cache'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -54,11 +55,12 @@ export async function GET() {
         const { uintCV, tupleCV, cvToHex, deserializeCV } = await import('@stacks/transactions')
         const keyHex = cvToHex(tupleCV({ 'round-id': uintCV(roundId) }))
         const res = await fetch(
-          `${HIRO_TESTNET}/v2/map_entry/${contractAddress}/${contractName}/rounds?proof=0`,
+          `${HIRO_TESTNET}/v2/map_entry/${contractAddress}/${contractName}/rounds?proof=0&tip=latest`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify(keyHex),
+            cache: 'no-store',
           }
         )
         const json = (await res.json()) as { data?: string }
@@ -76,8 +78,12 @@ export async function GET() {
         // Campos do contrato v5: total-up, total-down, price-start, price-end, resolved
         // Tempos são derivados do roundId (não armazenados no mapa)
         const startAt = roundId * 60 * 1000
-        const totalUp = u('total-up')
-        const totalDown = u('total-down')
+        const onChainUp = u('total-up')
+        const onChainDown = u('total-down')
+        // Merge with optimistic cache — max() so unconfirmed bets are visible to all clients
+        const optimistic = getOptimisticPool(roundId)
+        const totalUp = Math.max(onChainUp, optimistic.up)
+        const totalDown = Math.max(onChainDown, optimistic.down)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const resolved = (d['resolved'] as any)?.value === true || String(d['resolved']?.value) === 'true'
         const round = {

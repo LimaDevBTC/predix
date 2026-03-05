@@ -14,6 +14,7 @@ const BtcPriceChart = dynamic(() => import('./BtcPriceChart'), {
 })
 import { usePythPrice, getPriceAtTimestamp } from '@/lib/pyth'
 import { sponsoredContractCall, getSavedPublicKey, savePublicKey } from '@/lib/sponsored-tx'
+import confetti from 'canvas-confetti'
 
 const BITPREDIX_CONTRACT = process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv1'
 const TOKEN_CONTRACT = process.env.NEXT_PUBLIC_TEST_USDCX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx'
@@ -67,11 +68,9 @@ function getCurrentRoundInfo(): RoundInfo {
 
 interface RoundResult {
   roundId: number
-  betUp: number
-  betDown: number
   outcome: 'UP' | 'DOWN'
-  openPrice: number
-  closePrice: number
+  netPnL: number | null  // positive = won, negative = lost, null = pool data unavailable
+  won: boolean
 }
 
 interface PoolData {
@@ -93,6 +92,7 @@ export function MarketCardV4() {
   const [recentRounds, setRecentRounds] = useState<{ id: string; outcome: 'UP' | 'DOWN' }[]>([])
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
   const roundBetsRef = useRef(roundBets)
+  const poolRef = useRef(pool)
 
   const roundId = round?.id ?? null
   const lastRoundIdRef = useRef<number | null>(null)
@@ -112,14 +112,37 @@ export function MarketCardV4() {
         // Capture round result before resetting
         const prevBets = roundBetsRef.current
         const prevOpenPrice = openPriceRef.current
+        const prevPool = poolRef.current
         if (prevBets && (prevBets.up > 0 || prevBets.down > 0) && prevOpenPrice && currentPrice) {
+          const outcome: 'UP' | 'DOWN' = currentPrice > prevOpenPrice ? 'UP' : 'DOWN'
+          const totalCost = prevBets.up + prevBets.down
+          const winningBet = outcome === 'UP' ? prevBets.up : prevBets.down
+
+          let netPnL: number | null = null
+          if (prevPool && (prevPool.totalUp > 0 || prevPool.totalDown > 0)) {
+            const winningPool = outcome === 'UP' ? prevPool.totalUp : prevPool.totalDown
+            const totalPool = prevPool.totalUp + prevPool.totalDown
+            if (winningBet > 0 && winningPool > 0) {
+              const grossPayout = (winningBet / winningPool) * totalPool
+              const netPayout = grossPayout * 0.97
+              netPnL = Math.round((netPayout - totalCost) * 100) / 100
+            } else {
+              netPnL = -totalCost
+            }
+          } else if (winningBet > 0) {
+            // No pool data but user bet on winning side — can't calculate exact payout
+            // Show bet amount as minimum (contract returns at least 97% when no opposing pool)
+            netPnL = Math.round((winningBet * 0.97 - totalCost) * 100) / 100
+          } else {
+            // User only bet on losing side — total loss
+            netPnL = -totalCost
+          }
+
           setRoundResult({
             roundId: prevBets.roundId,
-            betUp: prevBets.up,
-            betDown: prevBets.down,
-            outcome: currentPrice > prevOpenPrice ? 'UP' : 'DOWN',
-            openPrice: prevOpenPrice,
-            closePrice: currentPrice,
+            outcome,
+            netPnL,
+            won: winningBet > 0,
           })
         }
 
@@ -201,13 +224,23 @@ export function MarketCardV4() {
     return () => { cancelled = true }
   }, [roundId])
 
-  // Keep roundBetsRef in sync for round transition capture
+  // Keep refs in sync for round transition capture
   useEffect(() => { roundBetsRef.current = roundBets }, [roundBets])
+  useEffect(() => { poolRef.current = pool }, [pool])
 
-  // Auto-dismiss round result after 5s
+  // Auto-dismiss round result after 8s + confetti on win
   useEffect(() => {
     if (!roundResult) return
-    const timer = setTimeout(() => setRoundResult(null), 5000)
+    if (roundResult.won) {
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.7 },
+        colors: ['#22c55e', '#4ade80', '#86efac', '#fbbf24', '#f59e0b'],
+        disableForReducedMotion: true,
+      })
+    }
+    const timer = setTimeout(() => setRoundResult(null), 8000)
     return () => clearTimeout(timer)
   }, [roundResult])
 
@@ -218,34 +251,45 @@ export function MarketCardV4() {
     return () => clearTimeout(timer)
   }, [error])
 
-  // Poll pool data from blockchain every 8s
+  // Poll pool data from blockchain — 3s normal, 2s burst after bet
+  const poolBurstUntilRef = useRef<number>(0)
+
+  const fetchPool = useCallback(async () => {
+    try {
+      const res = await fetch('/api/round', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      if (!data.ok) return
+
+      // Validate roundId — discard data from a different round
+      const apiRoundId = parseInt(String(data.round?.id ?? '').replace('round-', ''), 10)
+      if (!apiRoundId || apiRoundId !== lastRoundIdRef.current) return
+
+      const qUp = data.round?.pool?.qUp ?? 0
+      const qDown = data.round?.pool?.qDown ?? 0
+      setPool(prev => {
+        const up = Math.max(qUp, prev?.totalUp ?? 0)
+        const down = Math.max(qDown, prev?.totalDown ?? 0)
+        const { priceUp, priceDown } = calcSeededPrices(up, down)
+        return { totalUp: up, totalDown: down, priceUp, priceDown }
+      })
+    } catch { /* ignore */ }
+  }, [])
+
   useEffect(() => {
     if (!round) return
     let cancelled = false
 
-    const fetchPool = async () => {
-      try {
-        const res = await fetch('/api/round')
-        if (!res.ok || cancelled) return
-        const data = await res.json()
-        if (cancelled || !data.ok) return
-        const qUp = data.round?.pool?.qUp ?? 0
-        const qDown = data.round?.pool?.qDown ?? 0
-        // Never regress below optimistic values — blockchain tx may not be confirmed yet
-        // Pool values can only increase during a round (bets are irrevocable)
-        setPool(prev => {
-          const up = Math.max(qUp, prev?.totalUp ?? 0)
-          const down = Math.max(qDown, prev?.totalDown ?? 0)
-          const { priceUp, priceDown } = calcSeededPrices(up, down)
-          return { totalUp: up, totalDown: down, priceUp, priceDown }
-        })
-      } catch { /* ignore */ }
+    const poll = async () => {
+      if (cancelled) return
+      await fetchPool()
+      if (cancelled) return
+      const delay = Date.now() < poolBurstUntilRef.current ? 2000 : 3000
+      setTimeout(poll, delay)
     }
-
-    fetchPool()
-    const interval = setInterval(fetchPool, 8000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [roundId])
+    poll()
+    return () => { cancelled = true }
+  }, [roundId, fetchPool])
 
   // Fetch recent round outcomes from Pyth 1-min candle data
   // Re-runs on round change + delayed retry (candle may not be available instantly)
@@ -581,6 +625,16 @@ export function MarketCardV4() {
         return { totalUp: up, totalDown: down, priceUp, priceDown }
       })
 
+      // Notify server so ALL clients see this bet immediately (before on-chain confirmation)
+      fetch('/api/pool-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roundId: round.id, side, amountMicro }),
+      }).catch(() => {}) // fire-and-forget
+
+      // Burst mode: poll every 2s for 15s to quickly pick up on-chain confirmation
+      poolBurstUntilRef.current = Date.now() + 15000
+
       // Dispara evento para atualizar saldo em outros componentes
       window.dispatchEvent(new CustomEvent('bitpredix:balance-changed'))
 
@@ -662,44 +716,23 @@ export function MarketCardV4() {
             {roundResult ? (
               <div
                 className={`w-full h-full px-4 rounded-lg text-sm flex items-center justify-between gap-2 ${
-                  (() => {
-                    const won = roundResult.outcome === 'UP' ? roundResult.betUp : roundResult.betDown
-                    const lost = roundResult.outcome === 'UP' ? roundResult.betDown : roundResult.betUp
-                    if (won > 0 && lost === 0) return 'bg-up/10 border border-up/30'
-                    if (won > 0) return 'bg-amber-500/10 border border-amber-500/30'
-                    return 'bg-down/10 border border-down/30'
-                  })()
+                  roundResult.won ? 'bg-up/10 border border-up/30' : 'bg-down/10 border border-down/30'
                 }`}
                 style={{ animation: 'fadeIn 0.3s ease-out' }}
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className={`text-base font-bold shrink-0 ${roundResult.outcome === 'UP' ? 'text-up' : 'text-down'}`}>
-                    {roundResult.outcome === 'UP' ? '\u25B2' : '\u25BC'}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className={`text-lg shrink-0 ${roundResult.won ? 'text-up' : 'text-down'}`}>
+                    {roundResult.won ? '\u2713' : '\u2717'}
                   </span>
-                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                    {roundResult.betUp > 0 && (
-                      <span className={`font-mono text-xs ${roundResult.outcome === 'UP' ? 'text-up font-semibold' : 'text-zinc-500'}`}>
-                        {roundResult.outcome === 'UP' ? '\u2713' : '\u2717'}${roundResult.betUp} UP
-                      </span>
-                    )}
-                    {roundResult.betUp > 0 && roundResult.betDown > 0 && <span className="text-zinc-600">|</span>}
-                    {roundResult.betDown > 0 && (
-                      <span className={`font-mono text-xs ${roundResult.outcome === 'DOWN' ? 'text-down font-semibold' : 'text-zinc-500'}`}>
-                        {roundResult.outcome === 'DOWN' ? '\u2713' : '\u2717'}${roundResult.betDown} DN
-                      </span>
-                    )}
-                    <span className="text-zinc-600">·</span>
-                    <span className={`font-mono text-xs ${roundResult.outcome === 'UP' ? 'text-up' : 'text-down'}`}>
-                      {roundResult.outcome === 'UP' ? '+' : '-'}${Math.abs(roundResult.closePrice - roundResult.openPrice).toFixed(2)}
+                  <div className="flex flex-col">
+                    <span className={`font-bold text-sm ${roundResult.won ? 'text-up' : 'text-down'}`}>
+                      {roundResult.won ? 'You won!' : 'You lost'}
                     </span>
-                    <span className="text-zinc-600">·</span>
-                    {(() => {
-                      const won = roundResult.outcome === 'UP' ? roundResult.betUp : roundResult.betDown
-                      const lost = roundResult.outcome === 'UP' ? roundResult.betDown : roundResult.betUp
-                      if (won > 0 && lost === 0) return <span className="text-up font-bold text-xs">Won!</span>
-                      if (won > 0) return <span className="text-amber-400 font-semibold text-xs">Partial win</span>
-                      return <span className="text-down font-medium text-xs">Lost</span>
-                    })()}
+                    {roundResult.netPnL !== null && (
+                      <span className={`font-mono text-xs ${roundResult.won ? 'text-up/80' : 'text-down/80'}`}>
+                        {roundResult.netPnL >= 0 ? '+' : '-'}${Math.abs(roundResult.netPnL).toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button
