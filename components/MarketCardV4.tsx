@@ -93,6 +93,7 @@ export function MarketCardV4() {
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
   const roundBetsRef = useRef(roundBets)
   const poolRef = useRef(pool)
+  const clientIdRef = useRef(Math.random().toString(36).slice(2))
 
   const roundId = round?.id ?? null
   const lastRoundIdRef = useRef<number | null>(null)
@@ -301,16 +302,33 @@ export function MarketCardV4() {
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          if (data.type === 'pool-update' || data.type === 'snapshot') {
+
+          if (data.type === 'snapshot') {
+            // Absolute values on (re)connect — catch up to current state
             const rid = data.roundId
             if (rid !== lastRoundIdRef.current) return
-            const up = (data.totalUp ?? 0) / 1e6 // micro → USD
+            const up = (data.totalUp ?? 0) / 1e6
             const down = (data.totalDown ?? 0) / 1e6
             setPool(prev => {
               const newUp = Math.max(up, prev?.totalUp ?? 0)
               const newDown = Math.max(down, prev?.totalDown ?? 0)
               const { priceUp, priceDown } = calcSeededPrices(newUp, newDown)
               return { totalUp: newUp, totalDown: newDown, priceUp, priceDown }
+            })
+          } else if (data.type === 'pool-update') {
+            // Skip own echo — already applied optimistically in buy()
+            if (data.clientId === clientIdRef.current) return
+            const rid = data.roundId
+            if (rid !== lastRoundIdRef.current) return
+            // Apply DELTA from other clients (not absolute, avoids on-chain vs cache mismatch)
+            const delta = (data.amountMicro ?? 0) / 1e6
+            if (delta <= 0) return
+            setPool(prev => {
+              if (!prev) return prev
+              const up = prev.totalUp + (data.side === 'UP' ? delta : 0)
+              const down = prev.totalDown + (data.side === 'DOWN' ? delta : 0)
+              const { priceUp, priceDown } = calcSeededPrices(up, down)
+              return { totalUp: up, totalDown: down, priceUp, priceDown }
             })
           }
         } catch {}
@@ -668,11 +686,16 @@ export function MarketCardV4() {
       })
 
       // Notify server so ALL clients see this bet immediately (before on-chain confirmation)
-      fetch('/api/pool-update', {
+      const poolPayload = JSON.stringify({ roundId: round.id, side, amountMicro, clientId: clientIdRef.current })
+      const postPool = () => fetch('/api/pool-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roundId: round.id, side, amountMicro }),
-      }).catch(() => {}) // fire-and-forget
+        body: poolPayload,
+      })
+      postPool().catch(() => {
+        // Retry once after 1s — ensures SSE broadcast reaches other clients
+        setTimeout(() => postPool().catch(() => {}), 1000)
+      })
 
       // Burst mode: poll every 2s for 15s to quickly pick up on-chain confirmation
       poolBurstUntilRef.current = Date.now() + 15000

@@ -12,6 +12,7 @@ export interface PoolUpdate {
   amountMicro: number
   totalUp: number   // cumulative optimistic total (micro-units)
   totalDown: number // cumulative optimistic total (micro-units)
+  clientId?: string // originating client — receivers skip their own echo
 }
 
 type PoolUpdateCallback = (data: PoolUpdate) => void
