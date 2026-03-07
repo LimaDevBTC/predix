@@ -169,6 +169,9 @@ export function MarketCardV4() {
         tradeTapeTimersRef.current.forEach(clearTimeout)
         tradeTapeTimersRef.current = []
 
+        // Immediately fetch pool for the new round — don't wait for next poll cycle
+        fetchPoolRef.current()
+
         // Limpa cache de open prices antigos (mantém últimos 60 rounds = 1h)
         try {
           const keys = Object.keys(localStorage).filter(k => k.startsWith('opv3_') || k.startsWith('opv2_') || k.startsWith('openPrice_'))
@@ -281,8 +284,9 @@ export function MarketCardV4() {
     return () => clearTimeout(timer)
   }, [error])
 
-  // Poll pool data from blockchain — 5s baseline, 2s burst after own bet
+  // Poll pool data from blockchain — 3s baseline, 2s burst after own bet
   const poolBurstUntilRef = useRef<number>(0)
+  const fetchPoolRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
   const fetchPool = useCallback(async () => {
     try {
@@ -306,6 +310,9 @@ export function MarketCardV4() {
     } catch { /* ignore */ }
   }, [])
 
+  // Keep ref in sync so the round-transition effect can call fetchPool without a dep
+  useEffect(() => { fetchPoolRef.current = fetchPool }, [fetchPool])
+
   useEffect(() => {
     if (!round) return
     let cancelled = false
@@ -315,7 +322,7 @@ export function MarketCardV4() {
       await fetchPool()
       if (cancelled) return
       // SSE handles real-time updates; polling is now a fallback for on-chain confirmation
-      const delay = Date.now() < poolBurstUntilRef.current ? 2000 : 5000
+      const delay = Date.now() < poolBurstUntilRef.current ? 2000 : 3000
       setTimeout(poll, delay)
     }
     poll()
@@ -351,11 +358,17 @@ export function MarketCardV4() {
             if (data.clientId === clientIdRef.current) return
             const rid = data.roundId
             if (rid !== lastRoundIdRef.current) return
-            // Apply DELTA from other clients (not absolute, avoids on-chain vs cache mismatch)
+            // Apply DELTA from other clients; if pool is null, bootstrap from cumulative totals
             const delta = (data.amountMicro ?? 0) / 1e6
             if (delta <= 0) return
             setPool(prev => {
-              if (!prev) return prev
+              if (!prev) {
+                // Pool was null (round just started or reconnect) — use cumulative totals from server
+                const up = (data.totalUp ?? 0) / 1e6
+                const down = (data.totalDown ?? 0) / 1e6
+                const { priceUp, priceDown } = calcSeededPrices(up, down)
+                return { totalUp: up, totalDown: down, priceUp, priceDown }
+              }
               const up = prev.totalUp + (data.side === 'UP' ? delta : 0)
               const down = prev.totalDown + (data.side === 'DOWN' ? delta : 0)
               const { priceUp, priceDown } = calcSeededPrices(up, down)
@@ -379,8 +392,11 @@ export function MarketCardV4() {
 
       es.onerror = () => {
         es?.close()
-        // Reconnect after 3s on error
-        reconnectTimer = setTimeout(connect, 3000)
+        // Reconnect fast (1s) and immediately poll to catch missed deltas
+        reconnectTimer = setTimeout(() => {
+          fetchPoolRef.current()
+          connect()
+        }, 1000)
       }
     }
 
