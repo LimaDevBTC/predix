@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 /** Clients call this immediately after broadcasting a bet tx. */
 export async function POST(request: NextRequest) {
   try {
-    const { roundId, side, amountMicro, clientId } = await request.json()
+    const { roundId, side, amountMicro, clientId, tradeId: clientTradeId } = await request.json()
 
     if (typeof roundId !== 'number' || roundId <= 0) {
       return NextResponse.json({ error: 'invalid roundId' }, { status: 400 })
@@ -19,7 +19,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'invalid amountMicro' }, { status: 400 })
     }
 
-    addOptimisticBet(roundId, side, amountMicro)
+    const tradeId = addOptimisticBet(
+      roundId,
+      side,
+      amountMicro,
+      typeof clientTradeId === 'string' ? clientTradeId : undefined,
+    )
 
     // Broadcast to all connected SSE clients so they see the update instantly
     const pool = getOptimisticPool(roundId)
@@ -30,6 +35,7 @@ export async function POST(request: NextRequest) {
       totalUp: pool.up,
       totalDown: pool.down,
       clientId: typeof clientId === 'string' ? clientId : undefined,
+      tradeId,
     })
 
     return NextResponse.json({ ok: true })

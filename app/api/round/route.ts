@@ -1,7 +1,7 @@
 import { getOrCreateCurrentRound } from '@/lib/rounds'
 import { fetchBtcPriceUsd } from '@/lib/btc-price'
 import { getPriceUp, getPriceDown } from '@/lib/amm'
-import { getOptimisticPool } from '@/lib/pool-cache'
+import { getOptimisticPool, getRecentTrades } from '@/lib/pool-cache'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -105,11 +105,13 @@ export async function GET() {
         const effDown = VIRTUAL_SEED + totalDown
         const pu = effUp / (effUp + effDown)
         const pd = 1 - pu
+        const recentTrades = getRecentTrades(roundId)
         return NextResponse.json({
           round: roundToJson(round),
           priceUp: pu,
           priceDown: pd,
           serverNow: Date.now(),
+          recentTrades,
           ok: true,
         })
       } catch {

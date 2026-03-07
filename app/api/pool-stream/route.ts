@@ -1,5 +1,5 @@
 import { subscribePoolUpdates, subscribeOpenPrice } from '@/lib/pool-broadcast'
-import { getOptimisticPool, getOpenPrice } from '@/lib/pool-cache'
+import { getOptimisticPool, getOpenPrice, getRecentTrades } from '@/lib/pool-cache'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -22,7 +22,8 @@ export async function GET(request: Request) {
       // Send current pool state on connect (so late joiners catch up)
       const currentRoundId = Math.floor(Date.now() / 60000)
       const pool = getOptimisticPool(currentRoundId)
-      send({ type: 'snapshot', roundId: currentRoundId, totalUp: pool.up, totalDown: pool.down })
+      const trades = getRecentTrades(currentRoundId)
+      send({ type: 'snapshot', roundId: currentRoundId, totalUp: pool.up, totalDown: pool.down, recentTrades: trades })
 
       // Send current open price if already set (late joiners get it immediately)
       const openPrice = getOpenPrice(currentRoundId)

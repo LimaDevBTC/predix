@@ -18,6 +18,7 @@ export interface PoolUpdate {
   totalUp: number   // cumulative optimistic total (micro-units)
   totalDown: number // cumulative optimistic total (micro-units)
   clientId?: string // originating client — receivers skip their own echo
+  tradeId: string   // unique trade ID for deduplication
 }
 
 export interface OpenPriceUpdate {

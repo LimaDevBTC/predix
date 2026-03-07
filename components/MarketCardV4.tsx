@@ -97,6 +97,9 @@ export function MarketCardV4() {
   const roundBetsRef = useRef(roundBets)
   const poolRef = useRef(pool)
   const clientIdRef = useRef(Math.random().toString(36).slice(2))
+  const shownTradeIdsRef = useRef<Set<string>>(new Set())
+  const lastSSEMessageRef = useRef(Date.now())
+  const reconnectSSERef = useRef<() => void>(() => {})
 
   const roundId = round?.id ?? null
   const lastRoundIdRef = useRef<number | null>(null)
@@ -168,6 +171,7 @@ export function MarketCardV4() {
         setTradeTape([])
         tradeTapeTimersRef.current.forEach(clearTimeout)
         tradeTapeTimersRef.current = []
+        shownTradeIdsRef.current = new Set()
 
         // Immediately fetch pool for the new round — don't wait for next poll cycle
         fetchPoolRef.current()
@@ -247,6 +251,9 @@ export function MarketCardV4() {
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
+      // Full re-sync on tab resume: pool + SSE + open price
+      fetchPoolRef.current()
+      reconnectSSERef.current()
       const rid = lastRoundIdRef.current
       if (rid && !openPriceRef.current) {
         fetchingOpenForRef.current = null // reset so fetchCanonicalOpen can retry
@@ -307,8 +314,19 @@ export function MarketCardV4() {
         const { priceUp, priceDown } = calcSeededPrices(up, down)
         return { totalUp: up, totalDown: down, priceUp, priceDown }
       })
+
+      // Merge trade tape from polling (SSE-independent trade visibility)
+      if (Array.isArray(data.recentTrades)) {
+        const cutoff = Date.now() - 10000
+        for (const t of data.recentTrades) {
+          if (t.ts > cutoff && !shownTradeIdsRef.current.has(t.id)) {
+            shownTradeIdsRef.current.add(t.id)
+            pushTradeTape(t.side, Math.round(t.amount))
+          }
+        }
+      }
     } catch { /* ignore */ }
-  }, [])
+  }, [pushTradeTape])
 
   // Keep ref in sync so the round-transition effect can call fetchPool without a dep
   useEffect(() => { fetchPoolRef.current = fetchPool }, [fetchPool])
@@ -334,10 +352,23 @@ export function MarketCardV4() {
     let es: EventSource | null = null
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
+    // Helper: merge recent trades into tape with dedup
+    const mergeRecentTrades = (trades: { id: string; side: 'UP' | 'DOWN'; amount: number; ts: number }[] | undefined) => {
+      if (!Array.isArray(trades)) return
+      const cutoff = Date.now() - 10000
+      for (const t of trades) {
+        if (t.ts > cutoff && !shownTradeIdsRef.current.has(t.id)) {
+          shownTradeIdsRef.current.add(t.id)
+          pushTradeTape(t.side, Math.round(t.amount))
+        }
+      }
+    }
+
     const connect = () => {
       es = new EventSource('/api/pool-stream')
 
       es.onmessage = (event) => {
+        lastSSEMessageRef.current = Date.now()
         try {
           const data = JSON.parse(event.data)
 
@@ -353,29 +384,29 @@ export function MarketCardV4() {
               const { priceUp, priceDown } = calcSeededPrices(newUp, newDown)
               return { totalUp: newUp, totalDown: newDown, priceUp, priceDown }
             })
+            // Replay recent trades from snapshot (late joiners see recent bets)
+            mergeRecentTrades(data.recentTrades)
           } else if (data.type === 'pool-update') {
             // Skip own echo — already applied optimistically in buy()
             if (data.clientId === clientIdRef.current) return
             const rid = data.roundId
             if (rid !== lastRoundIdRef.current) return
-            // Apply DELTA from other clients; if pool is null, bootstrap from cumulative totals
-            const delta = (data.amountMicro ?? 0) / 1e6
-            if (delta <= 0) return
+            // Use ABSOLUTE totals from server — never delta arithmetic
+            const serverUp = (data.totalUp ?? 0) / 1e6
+            const serverDown = (data.totalDown ?? 0) / 1e6
             setPool(prev => {
-              if (!prev) {
-                // Pool was null (round just started or reconnect) — use cumulative totals from server
-                const up = (data.totalUp ?? 0) / 1e6
-                const down = (data.totalDown ?? 0) / 1e6
-                const { priceUp, priceDown } = calcSeededPrices(up, down)
-                return { totalUp: up, totalDown: down, priceUp, priceDown }
-              }
-              const up = prev.totalUp + (data.side === 'UP' ? delta : 0)
-              const down = prev.totalDown + (data.side === 'DOWN' ? delta : 0)
+              const up = Math.max(serverUp, prev?.totalUp ?? 0)
+              const down = Math.max(serverDown, prev?.totalDown ?? 0)
               const { priceUp, priceDown } = calcSeededPrices(up, down)
               return { totalUp: up, totalDown: down, priceUp, priceDown }
             })
-            // Show in trade tape
-            pushTradeTape(data.side, Math.round(delta))
+            // Show in trade tape with dedup
+            const tid = data.tradeId
+            if (tid && !shownTradeIdsRef.current.has(tid)) {
+              shownTradeIdsRef.current.add(tid)
+              const amount = (data.amountMicro ?? 0) / 1e6
+              if (amount > 0) pushTradeTape(data.side, Math.round(amount))
+            }
           } else if (data.type === 'open-price') {
             // Canonical open price from server — same for ALL clients
             const rid = data.roundId
@@ -392,7 +423,7 @@ export function MarketCardV4() {
 
       es.onerror = () => {
         es?.close()
-        // Reconnect fast (1s) and immediately poll to catch missed deltas
+        // Reconnect fast (1s) and immediately poll to catch missed events
         reconnectTimer = setTimeout(() => {
           fetchPoolRef.current()
           connect()
@@ -400,11 +431,28 @@ export function MarketCardV4() {
       }
     }
 
+    // Expose reconnect for tab-resume and heartbeat timeout
+    reconnectSSERef.current = () => {
+      es?.close()
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      connect()
+    }
+
+    // Heartbeat timeout — detect silently dead connections (server heartbeats every 25s)
+    const healthCheck = setInterval(() => {
+      if (Date.now() - lastSSEMessageRef.current > 35000) {
+        es?.close()
+        fetchPoolRef.current()
+        connect()
+      }
+    }, 10000)
+
     connect()
 
     return () => {
       es?.close()
       if (reconnectTimer) clearTimeout(reconnectTimer)
+      clearInterval(healthCheck)
     }
   }, [])
 
@@ -742,6 +790,10 @@ export function MarketCardV4() {
       })
       setAmount('')
 
+      // Generate tradeId client-side for dedup (pre-add so SSE/polling won't duplicate)
+      const tradeId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+      shownTradeIdsRef.current.add(tradeId)
+
       // Show own bet in trade tape (SSE echo is skipped via clientId)
       pushTradeTape(side, Math.round(v))
 
@@ -754,7 +806,7 @@ export function MarketCardV4() {
       })
 
       // Notify server so ALL clients see this bet immediately (before on-chain confirmation)
-      const poolPayload = JSON.stringify({ roundId: round.id, side, amountMicro, clientId: clientIdRef.current })
+      const poolPayload = JSON.stringify({ roundId: round.id, side, amountMicro, clientId: clientIdRef.current, tradeId })
       const postPool = () => fetch('/api/pool-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
