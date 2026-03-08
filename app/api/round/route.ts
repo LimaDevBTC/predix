@@ -1,7 +1,7 @@
 import { getOrCreateCurrentRound } from '@/lib/rounds'
 import { fetchBtcPriceUsd } from '@/lib/btc-price'
 import { getPriceUp, getPriceDown } from '@/lib/amm'
-import { getOptimisticPool, getRecentTrades } from '@/lib/pool-cache'
+import { getOptimisticPool, getRecentTrades, getOpenPrice } from '@/lib/pool-store'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -81,7 +81,11 @@ export async function GET() {
         const onChainUp = u('total-up')
         const onChainDown = u('total-down')
         // Merge with optimistic cache — max() so unconfirmed bets are visible to all clients
-        const optimistic = getOptimisticPool(roundId)
+        const [optimistic, recentTrades, serverOpenPrice] = await Promise.all([
+          getOptimisticPool(roundId),
+          getRecentTrades(roundId),
+          getOpenPrice(roundId),
+        ])
         const totalUp = Math.max(onChainUp, optimistic.up)
         const totalDown = Math.max(onChainDown, optimistic.down)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,13 +109,13 @@ export async function GET() {
         const effDown = VIRTUAL_SEED + totalDown
         const pu = effUp / (effUp + effDown)
         const pd = 1 - pu
-        const recentTrades = getRecentTrades(roundId)
         return NextResponse.json({
           round: roundToJson(round),
           priceUp: pu,
           priceDown: pd,
           serverNow: Date.now(),
           recentTrades,
+          openPrice: serverOpenPrice,
           ok: true,
         })
       } catch {

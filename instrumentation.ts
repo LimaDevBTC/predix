@@ -4,14 +4,16 @@
  * Monitors round transitions and captures the BTC open price from Pyth
  * directly on the server. This guarantees ALL clients see the exact same
  * open price, with zero dependency on any client being online.
+ *
+ * Stores open price in Upstash Redis (via pool-store) so all Vercel
+ * serverless instances share the same value.
  */
 
 export async function register() {
   // Only run on the Node.js server runtime (not edge, not client)
   if (typeof window !== 'undefined') return
 
-  const { setOpenPrice } = await import('@/lib/pool-cache')
-  const { broadcastOpenPrice } = await import('@/lib/pool-broadcast')
+  const { setOpenPrice } = await import('@/lib/pool-store')
 
   const HERMES_URL = 'https://hermes.pyth.network'
   const PYTH_BTC_USD_FEED = 'e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43'
@@ -39,9 +41,8 @@ export async function register() {
       const price = Number(priceData.price) * Math.pow(10, priceData.expo)
       if (!price || price <= 0) throw new Error(`Invalid price: ${price}`)
 
-      const accepted = setOpenPrice(currentRoundId, price)
+      const accepted = await setOpenPrice(currentRoundId, price)
       if (accepted) {
-        broadcastOpenPrice({ roundId: currentRoundId, price })
         console.log(`[OpenPrice] Round ${currentRoundId} open price set: $${price.toFixed(2)}`)
       }
     } catch (e) {

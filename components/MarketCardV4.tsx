@@ -96,10 +96,7 @@ export function MarketCardV4() {
   const tradeTapeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const roundBetsRef = useRef(roundBets)
   const poolRef = useRef(pool)
-  const clientIdRef = useRef(Math.random().toString(36).slice(2))
   const shownTradeIdsRef = useRef<Set<string>>(new Set())
-  const lastSSEMessageRef = useRef(Date.now())
-  const reconnectSSERef = useRef<() => void>(() => {})
 
   const roundId = round?.id ?? null
   const lastRoundIdRef = useRef<number | null>(null)
@@ -163,7 +160,7 @@ export function MarketCardV4() {
 
         lastRoundIdRef.current = newRound.id
         // Do NOT use the local Pyth price — it varies per device & timing.
-        // Set null and let SSE / fallback-fetch deliver the canonical server price.
+        // Set null and let KV polling / fallback-fetch deliver the canonical server price.
         openPriceRef.current = null
         fetchingOpenForRef.current = null
         setRoundBets(null)
@@ -207,7 +204,7 @@ export function MarketCardV4() {
 
     const cacheKey = `opv3_${rid}`
 
-    // Check localStorage cache first — set by SSE/server on this device
+    // Check localStorage cache first — set by polling/server on this device
     try {
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
@@ -251,9 +248,8 @@ export function MarketCardV4() {
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
-      // Full re-sync on tab resume: pool + SSE + open price
+      // Full re-sync on tab resume: pool + open price
       fetchPoolRef.current()
-      reconnectSSERef.current()
       const rid = lastRoundIdRef.current
       if (rid && !openPriceRef.current) {
         fetchingOpenForRef.current = null // reset so fetchCanonicalOpen can retry
@@ -291,8 +287,7 @@ export function MarketCardV4() {
     return () => clearTimeout(timer)
   }, [error])
 
-  // Poll pool data from blockchain — 3s baseline, 2s burst after own bet
-  const poolBurstUntilRef = useRef<number>(0)
+  // Poll pool data from KV — 1s constant (KV latency ~1-5ms)
   const fetchPoolRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
   const fetchPool = useCallback(async () => {
@@ -315,7 +310,7 @@ export function MarketCardV4() {
         return { totalUp: up, totalDown: down, priceUp, priceDown }
       })
 
-      // Merge trade tape from polling (SSE-independent trade visibility)
+      // Trade tape from polling with dedup
       if (Array.isArray(data.recentTrades)) {
         const cutoff = Date.now() - 10000
         for (const t of data.recentTrades) {
@@ -324,6 +319,13 @@ export function MarketCardV4() {
             pushTradeTape(t.side, Math.round(t.amount))
           }
         }
+      }
+
+      // Open price via polling (canonical from server KV)
+      if (data.openPrice && typeof data.openPrice === 'number' && data.openPrice > 0 && !openPriceRef.current) {
+        openPriceRef.current = data.openPrice
+        try { localStorage.setItem(`opv3_${apiRoundId}`, String(data.openPrice)) } catch {}
+        setRound(prev => prev ? { ...prev, priceAtStart: data.openPrice } : prev)
       }
     } catch { /* ignore */ }
   }, [pushTradeTape])
@@ -339,122 +341,11 @@ export function MarketCardV4() {
       if (cancelled) return
       await fetchPool()
       if (cancelled) return
-      // SSE handles real-time updates; polling is now a fallback for on-chain confirmation
-      const delay = Date.now() < poolBurstUntilRef.current ? 2000 : 3000
-      setTimeout(poll, delay)
+      setTimeout(poll, 1000)
     }
     poll()
     return () => { cancelled = true }
   }, [roundId, fetchPool])
-
-  // Real-time pool sync via SSE — all clients see bets instantly
-  useEffect(() => {
-    let es: EventSource | null = null
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-
-    // Helper: merge recent trades into tape with dedup
-    const mergeRecentTrades = (trades: { id: string; side: 'UP' | 'DOWN'; amount: number; ts: number }[] | undefined) => {
-      if (!Array.isArray(trades)) return
-      const cutoff = Date.now() - 10000
-      for (const t of trades) {
-        if (t.ts > cutoff && !shownTradeIdsRef.current.has(t.id)) {
-          shownTradeIdsRef.current.add(t.id)
-          pushTradeTape(t.side, Math.round(t.amount))
-        }
-      }
-    }
-
-    const connect = () => {
-      es = new EventSource('/api/pool-stream')
-
-      es.onmessage = (event) => {
-        lastSSEMessageRef.current = Date.now()
-        try {
-          const data = JSON.parse(event.data)
-
-          if (data.type === 'snapshot') {
-            // Absolute values on (re)connect — catch up to current state
-            const rid = data.roundId
-            if (rid !== lastRoundIdRef.current) return
-            const up = (data.totalUp ?? 0) / 1e6
-            const down = (data.totalDown ?? 0) / 1e6
-            setPool(prev => {
-              const newUp = Math.max(up, prev?.totalUp ?? 0)
-              const newDown = Math.max(down, prev?.totalDown ?? 0)
-              const { priceUp, priceDown } = calcSeededPrices(newUp, newDown)
-              return { totalUp: newUp, totalDown: newDown, priceUp, priceDown }
-            })
-            // Replay recent trades from snapshot (late joiners see recent bets)
-            mergeRecentTrades(data.recentTrades)
-          } else if (data.type === 'pool-update') {
-            // Skip own echo — already applied optimistically in buy()
-            if (data.clientId === clientIdRef.current) return
-            const rid = data.roundId
-            if (rid !== lastRoundIdRef.current) return
-            // Use ABSOLUTE totals from server — never delta arithmetic
-            const serverUp = (data.totalUp ?? 0) / 1e6
-            const serverDown = (data.totalDown ?? 0) / 1e6
-            setPool(prev => {
-              const up = Math.max(serverUp, prev?.totalUp ?? 0)
-              const down = Math.max(serverDown, prev?.totalDown ?? 0)
-              const { priceUp, priceDown } = calcSeededPrices(up, down)
-              return { totalUp: up, totalDown: down, priceUp, priceDown }
-            })
-            // Show in trade tape with dedup
-            const tid = data.tradeId
-            if (tid && !shownTradeIdsRef.current.has(tid)) {
-              shownTradeIdsRef.current.add(tid)
-              const amount = (data.amountMicro ?? 0) / 1e6
-              if (amount > 0) pushTradeTape(data.side, Math.round(amount))
-            }
-          } else if (data.type === 'open-price') {
-            // Canonical open price from server — same for ALL clients
-            const rid = data.roundId
-            if (rid !== lastRoundIdRef.current) return
-            const price = data.price
-            if (typeof price === 'number' && price > 0) {
-              openPriceRef.current = price
-              try { localStorage.setItem(`opv3_${rid}`, String(price)) } catch {}
-              setRound(prev => prev ? { ...prev, priceAtStart: price } : prev)
-            }
-          }
-        } catch {}
-      }
-
-      es.onerror = () => {
-        es?.close()
-        // Reconnect fast (1s) and immediately poll to catch missed events
-        reconnectTimer = setTimeout(() => {
-          fetchPoolRef.current()
-          connect()
-        }, 1000)
-      }
-    }
-
-    // Expose reconnect for tab-resume and heartbeat timeout
-    reconnectSSERef.current = () => {
-      es?.close()
-      if (reconnectTimer) clearTimeout(reconnectTimer)
-      connect()
-    }
-
-    // Heartbeat timeout — detect silently dead connections (server heartbeats every 25s)
-    const healthCheck = setInterval(() => {
-      if (Date.now() - lastSSEMessageRef.current > 35000) {
-        es?.close()
-        fetchPoolRef.current()
-        connect()
-      }
-    }, 10000)
-
-    connect()
-
-    return () => {
-      es?.close()
-      if (reconnectTimer) clearTimeout(reconnectTimer)
-      clearInterval(healthCheck)
-    }
-  }, [])
 
   // Fetch recent round outcomes from Pyth 1-min candle data
   // Re-runs on round change + delayed retry (candle may not be available instantly)
@@ -790,11 +681,11 @@ export function MarketCardV4() {
       })
       setAmount('')
 
-      // Generate tradeId client-side for dedup (pre-add so SSE/polling won't duplicate)
+      // Generate tradeId client-side for dedup (pre-add so polling won't duplicate)
       const tradeId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
       shownTradeIdsRef.current.add(tradeId)
 
-      // Show own bet in trade tape (SSE echo is skipped via clientId)
+      // Show own bet in trade tape immediately
       pushTradeTape(side, Math.round(v))
 
       // Optimistic pool update — reflect bet instantly in UI
@@ -805,20 +696,16 @@ export function MarketCardV4() {
         return { totalUp: up, totalDown: down, priceUp, priceDown }
       })
 
-      // Notify server so ALL clients see this bet immediately (before on-chain confirmation)
-      const poolPayload = JSON.stringify({ roundId: round.id, side, amountMicro, clientId: clientIdRef.current, tradeId })
+      // Notify server so ALL clients see this bet via KV polling
+      const poolPayload = JSON.stringify({ roundId: round.id, side, amountMicro, tradeId })
       const postPool = () => fetch('/api/pool-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: poolPayload,
       })
       postPool().catch(() => {
-        // Retry once after 1s — ensures SSE broadcast reaches other clients
         setTimeout(() => postPool().catch(() => {}), 1000)
       })
-
-      // Burst mode: poll every 2s for 15s to quickly pick up on-chain confirmation
-      poolBurstUntilRef.current = Date.now() + 15000
 
       // Dispara evento para atualizar saldo em outros componentes
       window.dispatchEvent(new CustomEvent('bitpredix:balance-changed'))
