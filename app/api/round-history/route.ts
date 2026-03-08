@@ -3,6 +3,7 @@ import { getRoundHistory, getIndexerStatus, getGlobalStats } from '@/lib/round-i
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const maxDuration = 60
 
 /**
  * GET /api/round-history?page=1&pageSize=10         → paginated round list

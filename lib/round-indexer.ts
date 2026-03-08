@@ -1,10 +1,13 @@
 /**
- * Round Indexer — server-side in-memory indexer for BitPredix round history.
+ * Round Indexer — server-side indexer for BitPredix round history.
  *
  * Scans contract transactions from the Hiro API, parses place-bet and claim
  * calls, and builds a complete round index. Resolved rounds are cached
  * permanently (immutable data). Supports v5 (claim-round) and v6
  * (claim-round-side) contract formats.
+ *
+ * Persistence: Uses Upstash Redis to cache the full index so Vercel serverless
+ * cold starts hydrate instantly instead of re-scanning all contract history.
  */
 
 // ============================================================================
@@ -129,15 +132,40 @@ interface HiroTx {
 // CONFIG
 // ============================================================================
 
+import { Redis } from '@upstash/redis'
+
 const HIRO_API = 'https://api.testnet.hiro.so'
 const DEPLOYER = 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK'
 const SCAN_PAGE_SIZE = 50
 const MAX_PAGES_PER_SCAN = 20
 const MIN_SCAN_INTERVAL_MS = 30_000
 const FETCH_TIMEOUT = 12_000
+const REDIS_CACHE_KEY = 'indexer:cache:v1'
+const REDIS_CACHE_TTL = 3600 // 1 hour
 
 function getContractAddress(): string {
   return process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || `${DEPLOYER}.predixv1`
+}
+
+// ============================================================================
+// REDIS CLIENT (lazy singleton)
+// ============================================================================
+
+let _redis: Redis | null = null
+let _redisChecked = false
+
+function getRedis(): Redis | null {
+  if (_redis) return _redis
+  if (_redisChecked) return null
+  _redisChecked = true
+
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.UPSTASH_KV_REST_API_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.UPSTASH_KV_REST_API_TOKEN
+  if (url && token) {
+    _redis = new Redis({ url, token })
+    return _redis
+  }
+  return null
 }
 
 // ============================================================================
@@ -152,6 +180,7 @@ let totalTxsIndexed = 0
 let scanInProgress = false
 let initialScanDone = false
 let activeScanPromise: Promise<void> | null = null
+let hydratedFromCache = false
 
 // ============================================================================
 // PARSING HELPERS
@@ -373,12 +402,77 @@ async function enrichUnresolvedRounds(): Promise<void> {
 }
 
 // ============================================================================
+// REDIS CACHE — persist index across Vercel cold starts
+// ============================================================================
+
+interface IndexerCache {
+  rounds: [number, IndexedRound][]
+  txIds: string[]
+  totalTxsIndexed: number
+  savedAt: number
+}
+
+async function hydrateFromRedis(): Promise<boolean> {
+  if (hydratedFromCache) return false
+  hydratedFromCache = true
+
+  const kv = getRedis()
+  if (!kv) return false
+
+  try {
+    const cached = await kv.get<IndexerCache>(REDIS_CACHE_KEY)
+    if (!cached || !cached.rounds) return false
+
+    for (const [id, round] of cached.rounds) {
+      if (!roundsIndex.has(id)) roundsIndex.set(id, round)
+    }
+    for (const txId of cached.txIds) {
+      knownTxIds.add(txId)
+    }
+    totalTxsIndexed = cached.totalTxsIndexed || 0
+    console.log(`[round-indexer] Hydrated from Redis: ${cached.rounds.length} rounds, ${cached.txIds.length} txIds`)
+    return true
+  } catch (e) {
+    console.error('[round-indexer] Redis hydrate error:', e instanceof Error ? e.message : e)
+    return false
+  }
+}
+
+async function persistToRedis(): Promise<void> {
+  const kv = getRedis()
+  if (!kv) return
+
+  try {
+    const cache: IndexerCache = {
+      rounds: [...roundsIndex.entries()],
+      txIds: [...knownTxIds],
+      totalTxsIndexed,
+      savedAt: Date.now(),
+    }
+    await kv.set(REDIS_CACHE_KEY, cache, { ex: REDIS_CACHE_TTL })
+    console.log(`[round-indexer] Persisted to Redis: ${cache.rounds.length} rounds`)
+  } catch (e) {
+    console.error('[round-indexer] Redis persist error:', e instanceof Error ? e.message : e)
+  }
+}
+
+// ============================================================================
 // SCAN ENGINE
 // ============================================================================
 
 async function scanContractTransactions(): Promise<void> {
   // If a scan is already running, wait for it instead of returning empty
   if (activeScanPromise) return activeScanPromise
+
+  // On cold start, hydrate from Redis first
+  if (!hydratedFromCache) {
+    await hydrateFromRedis()
+    // If we got data from cache, mark initial scan done so we only do incremental
+    if (roundsIndex.size > 0) {
+      initialScanDone = true
+      lastScanTimestamp = Date.now() - MIN_SCAN_INTERVAL_MS // allow immediate incremental scan
+    }
+  }
 
   const now = Date.now()
   if (initialScanDone && now - lastScanTimestamp < MIN_SCAN_INTERVAL_MS) return
@@ -426,11 +520,14 @@ async function doScan(now: number): Promise<void> {
               recalcRoundTotals(round)
               newTxs++
             }
-            knownTxIds.add(tx.tx_id)
           }
+          // Always mark as known (even if parse fails) to avoid re-processing
+          knownTxIds.add(tx.tx_id)
         }
 
         if (fn === 'claim-round' || fn === 'claim-round-side' || fn === 'resolve-round' || fn === 'claim-on-behalf') {
+          // Always mark as known regardless of status
+          knownTxIds.add(tx.tx_id)
           if (tx.tx_status === 'success') {
             const parsed = parseClaimTx(tx)
             if (parsed) {
@@ -442,7 +539,6 @@ async function doScan(now: number): Promise<void> {
                 round.outcome = parsed.priceEnd > parsed.priceStart ? 'UP' : 'DOWN'
                 round.lastUpdated = Date.now()
               }
-              knownTxIds.add(tx.tx_id)
               newTxs++
             }
           }
@@ -463,6 +559,12 @@ async function doScan(now: number): Promise<void> {
 
     lastScanTimestamp = now
     initialScanDone = true
+
+    // Persist to Redis after successful scan (if we found new data or first scan)
+    if (newTxs > 0 || roundsIndex.size > 0) {
+      // Fire-and-forget to avoid blocking the response
+      persistToRedis().catch(() => {})
+    }
   } catch (e) {
     console.error('[round-indexer] Scan error:', e instanceof Error ? e.message : e)
   }
