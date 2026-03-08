@@ -12,6 +12,7 @@ import {
   clearSponsorNonce,
   acquireSponsorLock,
   releaseSponsorLock,
+  addOptimisticBet,
 } from '@/lib/pool-store'
 
 // Contratos permitidos para sponsorship
@@ -142,6 +143,27 @@ export async function POST(req: NextRequest) {
         await setSponsorNonce(usedNonce + BigInt(1))
       } catch {
         await clearSponsorNonce()
+      }
+
+      // Server-side optimistic KV write for place-bet — guarantees all clients
+      // see the bet even if the client's fire-and-forget POST to /api/pool-update fails.
+      // Uses txid as tradeId for dedup (client pool-update uses same txid).
+      if (functionName === 'place-bet') {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const funcArgs = (payload as any).functionArgs
+          if (Array.isArray(funcArgs) && funcArgs.length >= 3) {
+            const roundId = Number(funcArgs[0]?.value ?? 0)
+            const side = String(funcArgs[1]?.value ?? '').toUpperCase()
+            const amountMicro = Number(funcArgs[2]?.value ?? 0)
+            if (roundId > 0 && (side === 'UP' || side === 'DOWN') && amountMicro > 0) {
+              await addOptimisticBet(roundId, side as 'UP' | 'DOWN', amountMicro, result.txid)
+              console.log(`[sponsor] KV optimistic: round=${roundId} ${side} $${(amountMicro / 1e6).toFixed(2)} txid=${result.txid}`)
+            }
+          }
+        } catch (kvErr) {
+          console.warn('[sponsor] KV optimistic write failed (non-fatal):', kvErr)
+        }
       }
 
       return NextResponse.json({ txid: result.txid })

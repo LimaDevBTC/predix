@@ -292,7 +292,8 @@ export function MarketCardV4() {
 
   const fetchPool = useCallback(async () => {
     try {
-      const res = await fetch('/api/round', { cache: 'no-store' })
+      // Cache-busting query param to defeat any CDN/edge caching
+      const res = await fetch(`/api/round?_=${Date.now()}`, { cache: 'no-store' })
       if (!res.ok) return
       const data = await res.json()
       if (!data.ok) return
@@ -301,18 +302,24 @@ export function MarketCardV4() {
       const apiRoundId = parseInt(String(data.round?.id ?? '').replace('round-', ''), 10)
       if (!apiRoundId || apiRoundId !== lastRoundIdRef.current) return
 
+      // Server is authoritative: it merges on-chain + KV optimistic data.
+      // Use server values directly (they already include our optimistic bet via KV).
+      // Only keep local max for the brief window between local optimistic update
+      // and the next server poll that reflects it.
       const qUp = data.round?.pool?.qUp ?? 0
       const qDown = data.round?.pool?.qDown ?? 0
       setPool(prev => {
+        // Server sees all bets from all clients via KV.
+        // Keep local max only if it's from our own un-synced optimistic update.
         const up = Math.max(qUp, prev?.totalUp ?? 0)
         const down = Math.max(qDown, prev?.totalDown ?? 0)
         const { priceUp, priceDown } = calcSeededPrices(up, down)
         return { totalUp: up, totalDown: down, priceUp, priceDown }
       })
 
-      // Trade tape from polling with dedup
+      // Trade tape from polling with dedup — generous 30s window to handle latency/clock skew
       if (Array.isArray(data.recentTrades)) {
-        const cutoff = Date.now() - 10000
+        const cutoff = Date.now() - 30000
         for (const t of data.recentTrades) {
           if (t.ts > cutoff && !shownTradeIdsRef.current.has(t.id)) {
             shownTradeIdsRef.current.add(t.id)
@@ -326,6 +333,11 @@ export function MarketCardV4() {
         openPriceRef.current = data.openPrice
         try { localStorage.setItem(`opv3_${apiRoundId}`, String(data.openPrice)) } catch {}
         setRound(prev => prev ? { ...prev, priceAtStart: data.openPrice } : prev)
+      }
+
+      // Log Redis connectivity status (dev only)
+      if (typeof data.kvConnected === 'boolean' && !data.kvConnected) {
+        console.warn('[sync] Server KV NOT connected — cross-device sync disabled')
       }
     } catch { /* ignore */ }
   }, [pushTradeTape])
@@ -681,8 +693,9 @@ export function MarketCardV4() {
       })
       setAmount('')
 
-      // Generate tradeId client-side for dedup (pre-add so polling won't duplicate)
-      const tradeId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+      // Use txid as tradeId for dedup — sponsor already wrote to KV with this ID,
+      // so pool-update will be a no-op (dedup hit). This prevents double-counting.
+      const tradeId = txid
       shownTradeIdsRef.current.add(tradeId)
 
       // Show own bet in trade tape immediately

@@ -23,17 +23,32 @@ export interface RecentTrade {
 // ---------------------------------------------------------------------------
 
 let redis: Redis | null = null
+let redisChecked = false
+let redisConnected = false
 
 function getRedis(): Redis | null {
   if (redis) return redis
+  if (redisChecked) return null
+
   // Support both naming conventions: UPSTASH_REDIS_REST_* (standard) and UPSTASH_KV_REST_API_* (Vercel integration)
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.UPSTASH_KV_REST_API_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.UPSTASH_KV_REST_API_TOKEN
+  redisChecked = true
+
   if (url && token) {
     redis = new Redis({ url, token })
+    redisConnected = true
+    console.log('[pool-store] Redis connected:', url.replace(/^(https?:\/\/[^/]+).*/, '$1'))
     return redis
   }
+
+  console.warn('[pool-store] NO REDIS — falling back to in-memory (cross-device sync WILL NOT work on Vercel)')
   return null
+}
+
+export function isRedisConnected(): boolean {
+  getRedis() // ensure checked
+  return redisConnected
 }
 
 // ---------------------------------------------------------------------------
@@ -64,65 +79,95 @@ export async function addOptimisticBet(
   const kv = getRedis()
 
   if (kv) {
-    const field = side === 'UP' ? 'up' : 'down'
-    const pipe = kv.pipeline()
-    pipe.hincrby(`pool:${roundId}`, field, amountMicro)
-    pipe.expire(`pool:${roundId}`, 300)
-    pipe.lpush(`trades:${roundId}`, JSON.stringify(trade))
-    pipe.ltrim(`trades:${roundId}`, 0, 29)
-    pipe.expire(`trades:${roundId}`, 120)
-    await pipe.exec()
-  } else {
-    // In-memory fallback
-    const pools = g.__poolCache!
-    const current = pools.get(roundId) ?? { up: 0, down: 0 }
-    if (side === 'UP') current.up += amountMicro
-    else current.down += amountMicro
-    pools.set(roundId, current)
-
-    const trades = g.__recentTrades!
-    const list = trades.get(roundId) ?? []
-    list.push(trade)
-    const cutoff = Date.now() - 60000
-    trades.set(roundId, list.filter(t => t.ts > cutoff).slice(-20))
-
-    // Evict old rounds
-    if (pools.size > 3) {
-      const sorted = [...pools.keys()].sort((a, b) => a - b)
-      for (let i = 0; i < sorted.length - 3; i++) {
-        pools.delete(sorted[i])
-        trades.delete(sorted[i])
+    try {
+      // Dedup: prevent double-counting when both sponsor and client pool-update
+      // call this function for the same bet. Uses SETNX — first write wins.
+      const dedupKey = `trade-seen:${roundId}:${id}`
+      const isNew = await kv.set(dedupKey, '1', { nx: true, ex: 120 })
+      if (isNew !== 'OK') {
+        console.log(`[pool-store] Dedup hit: trade ${id} already processed, skipping`)
+        return id
       }
+
+      const field = side === 'UP' ? 'up' : 'down'
+      const pipe = kv.pipeline()
+      pipe.hincrby(`pool:${roundId}`, field, amountMicro)
+      pipe.expire(`pool:${roundId}`, 300)
+      pipe.lpush(`trades:${roundId}`, JSON.stringify(trade))
+      pipe.ltrim(`trades:${roundId}`, 0, 49) // keep more trades for sync
+      pipe.expire(`trades:${roundId}`, 120)
+      await pipe.exec()
+      console.log(`[pool-store] KV bet written: round=${roundId} ${side} $${(amountMicro / 1e6).toFixed(2)} id=${id}`)
+    } catch (err) {
+      console.error('[pool-store] Redis WRITE failed:', (err as Error).message)
+      // Fall through to in-memory so at least the current instance sees it
+      writeFallback(roundId, side, amountMicro, trade)
     }
+  } else {
+    writeFallback(roundId, side, amountMicro, trade)
   }
 
   return id
 }
 
-export async function getOptimisticPool(roundId: number): Promise<{ up: number; down: number }> {
-  const kv = getRedis()
-  if (kv) {
-    const data = await kv.hgetall(`pool:${roundId}`)
-    if (!data || Object.keys(data).length === 0) return { up: 0, down: 0 }
-    return {
-      up: Number((data as Record<string, unknown>).up || 0),
-      down: Number((data as Record<string, unknown>).down || 0),
+function writeFallback(roundId: number, side: 'UP' | 'DOWN', amountMicro: number, trade: RecentTrade) {
+  const pools = g.__poolCache!
+  const current = pools.get(roundId) ?? { up: 0, down: 0 }
+  if (side === 'UP') current.up += amountMicro
+  else current.down += amountMicro
+  pools.set(roundId, current)
+
+  const trades = g.__recentTrades!
+  const list = trades.get(roundId) ?? []
+  list.push(trade)
+  const cutoff = Date.now() - 60000
+  trades.set(roundId, list.filter(t => t.ts > cutoff).slice(-30))
+
+  // Evict old rounds
+  if (pools.size > 3) {
+    const sorted = [...pools.keys()].sort((a, b) => a - b)
+    for (let i = 0; i < sorted.length - 3; i++) {
+      pools.delete(sorted[i])
+      trades.delete(sorted[i])
     }
   }
-  return g.__poolCache!.get(roundId) ?? { up: 0, down: 0 }
+}
+
+export async function getOptimisticPool(roundId: number): Promise<{ up: number; down: number; _kvConnected?: boolean }> {
+  const kv = getRedis()
+  if (kv) {
+    try {
+      const data = await kv.hgetall(`pool:${roundId}`)
+      if (!data || Object.keys(data).length === 0) return { up: 0, down: 0, _kvConnected: true }
+      return {
+        up: Number((data as Record<string, unknown>).up || 0),
+        down: Number((data as Record<string, unknown>).down || 0),
+        _kvConnected: true,
+      }
+    } catch (err) {
+      console.error('[pool-store] Redis READ failed:', (err as Error).message)
+      // Fall through to in-memory
+    }
+  }
+  const mem = g.__poolCache!.get(roundId) ?? { up: 0, down: 0 }
+  return { ...mem, _kvConnected: false }
 }
 
 export async function getRecentTrades(roundId: number): Promise<RecentTrade[]> {
   const kv = getRedis()
   if (kv) {
-    const raw: string[] = await kv.lrange(`trades:${roundId}`, 0, 29)
-    if (!raw || raw.length === 0) return []
-    const now = Date.now()
-    return raw
-      .map(item => typeof item === 'string' ? JSON.parse(item) : item)
-      .filter((t: RecentTrade) => now - t.ts < 60_000)
+    try {
+      const raw: string[] = await kv.lrange(`trades:${roundId}`, 0, 49)
+      if (!raw || raw.length === 0) return []
+      const now = Date.now()
+      return raw
+        .map(item => typeof item === 'string' ? JSON.parse(item) : item)
+        .filter((t: RecentTrade) => now - t.ts < 120_000) // keep trades for 2 minutes
+    } catch (err) {
+      console.error('[pool-store] Redis trades READ failed:', (err as Error).message)
+    }
   }
-  const cutoff = Date.now() - 60000
+  const cutoff = Date.now() - 120_000
   return (g.__recentTrades!.get(roundId) ?? []).filter(t => t.ts > cutoff)
 }
 
@@ -133,8 +178,12 @@ export async function getRecentTrades(roundId: number): Promise<RecentTrade[]> {
 export async function setOpenPrice(roundId: number, price: number): Promise<boolean> {
   const kv = getRedis()
   if (kv) {
-    const result = await kv.set(`open-price:${roundId}`, price, { nx: true, ex: 300 })
-    return result === 'OK'
+    try {
+      const result = await kv.set(`open-price:${roundId}`, price, { nx: true, ex: 300 })
+      return result === 'OK'
+    } catch (err) {
+      console.error('[pool-store] Redis setOpenPrice failed:', (err as Error).message)
+    }
   }
   // In-memory fallback
   if (g.__openPriceCache!.has(roundId)) return false
@@ -149,8 +198,12 @@ export async function setOpenPrice(roundId: number, price: number): Promise<bool
 export async function getOpenPrice(roundId: number): Promise<number | null> {
   const kv = getRedis()
   if (kv) {
-    const val = await kv.get<number>(`open-price:${roundId}`)
-    return val ?? null
+    try {
+      const val = await kv.get<number>(`open-price:${roundId}`)
+      return val ?? null
+    } catch (err) {
+      console.error('[pool-store] Redis getOpenPrice failed:', (err as Error).message)
+    }
   }
   return g.__openPriceCache!.get(roundId) ?? null
 }
