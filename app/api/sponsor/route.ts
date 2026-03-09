@@ -146,6 +146,20 @@ export async function POST(req: NextRequest) {
       const tracked = await getSponsorNonce()
       if (tracked) {
         sponsorOpts.sponsorNonce = tracked.nonce
+      } else {
+        // KV expired — fetch from extended API (accounts for mempool txs)
+        // The default fetchNonce in @stacks/transactions uses /v2/accounts/ which
+        // only sees confirmed state, causing ConflictingNonceInMempool with ghost txs.
+        try {
+          const nonceRes = await fetch(
+            `https://api.testnet.hiro.so/extended/v1/address/${sponsorAddressCache}/nonces`
+          )
+          const nonceData = await nonceRes.json()
+          sponsorOpts.sponsorNonce = BigInt(nonceData.possible_next_nonce)
+          console.log(`[sponsor] Fetched sponsor nonce from extended API: ${nonceData.possible_next_nonce}`)
+        } catch (e) {
+          console.warn('[sponsor] Failed to fetch nonce from extended API, falling back to auto-fetch')
+        }
       }
     }
 
