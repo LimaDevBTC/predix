@@ -157,7 +157,17 @@ export async function POST(req: NextRequest) {
       network: 'testnet',
     })
 
-    // v7: broadcastTransaction returns { txid } on success, or error object on failure
+    // v7: broadcastTransaction returns { txid } on success, BUT rejected txs
+    // ALSO include txid alongside error/reason fields. Must check error first!
+    if ('error' in result) {
+      await clearSponsorNonce()
+      console.error('[sponsor] Broadcast rejected:', JSON.stringify(result))
+      return NextResponse.json(
+        { error: (result as Record<string, unknown>).error, reason: (result as Record<string, unknown>).reason },
+        { status: 400 }
+      )
+    }
+
     if ('txid' in result) {
       console.log('[sponsor] Broadcast OK:', result.txid)
 
@@ -197,13 +207,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ txid: result.txid })
     }
 
-    // Error case — clear tracked nonce
+    // Unexpected result shape
     await clearSponsorNonce()
-    console.error('[sponsor] Broadcast failed:', result)
-    return NextResponse.json(
-      { error: (result as Record<string, unknown>).error ?? 'Broadcast failed', reason: (result as Record<string, unknown>).reason },
-      { status: 400 }
-    )
+    console.error('[sponsor] Unexpected broadcast result:', result)
+    return NextResponse.json({ error: 'Unexpected broadcast result' }, { status: 500 })
   } catch (err: unknown) {
     await clearSponsorNonce()
     console.error('[sponsor] Error:', err)

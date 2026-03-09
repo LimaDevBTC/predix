@@ -57,19 +57,21 @@ async function main() {
   console.log(`Missing nonces: ${detected_missing_nonces.join(', ')}`)
   console.log(`Mempool nonces: ${detected_mempool_nonces.length}`)
 
-  // 3. Fill each missing nonce with a 1-uSTX self-transfer
+  // 3. Fill each missing nonce with a 1-uSTX transfer to burn address
+  // NOTE: Stacks rejects self-transfers (TransferRecipientCannotEqualSender)
+  const BURN_ADDRESS = 'ST000000000000000000002AMW42H'
   console.log(`\nFilling ${detected_missing_nonces.length} missing nonce(s)...\n`)
 
   for (const nonce of detected_missing_nonces.sort((a, b) => a - b)) {
-    console.log(`Nonce ${nonce}: submitting 1-uSTX self-transfer...`)
+    console.log(`Nonce ${nonce}: submitting 1-uSTX transfer to burn address...`)
 
     try {
       const tx = await makeSTXTokenTransfer({
-        recipient: address, // self-transfer
+        recipient: BURN_ADDRESS,
         amount: BigInt(1),  // 1 micro-STX
         senderKey: privateKey,
         network: STACKS_TESTNET,
-        fee: BigInt(50000),  // 0.05 STX
+        fee: BigInt(500000),  // 0.5 STX (high enough to not get dropped)
         nonce: BigInt(nonce),
         memo: `nonce-fill-${nonce}`,
       })
