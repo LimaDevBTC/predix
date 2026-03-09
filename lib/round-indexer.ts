@@ -305,11 +305,12 @@ function ensureRound(roundId: number): IndexedRound {
 }
 
 function recalcRoundTotals(round: IndexedRound): void {
-  const successBets = round.bets.filter((b) => b.status === 'success')
-  round.totalUpUsd = successBets.filter((b) => b.side === 'UP').reduce((s, b) => s + b.amountUsd, 0)
-  round.totalDownUsd = successBets.filter((b) => b.side === 'DOWN').reduce((s, b) => s + b.amountUsd, 0)
+  // Count both success and pending bets for pool totals (pending = mempool, not yet confirmed)
+  const activeBets = round.bets.filter((b) => b.status === 'success' || b.status === 'pending')
+  round.totalUpUsd = activeBets.filter((b) => b.side === 'UP').reduce((s, b) => s + b.amountUsd, 0)
+  round.totalDownUsd = activeBets.filter((b) => b.side === 'DOWN').reduce((s, b) => s + b.amountUsd, 0)
   round.totalPoolUsd = round.totalUpUsd + round.totalDownUsd
-  round.participantCount = new Set(successBets.map((b) => b.user)).size
+  round.participantCount = new Set(activeBets.map((b) => b.user)).size
   round.lastUpdated = Date.now()
 }
 
@@ -334,6 +335,28 @@ async function fetchContractTxs(contractAddress: string, limit: number, offset: 
   } catch (e) {
     clearTimeout(timeoutId)
     throw e
+  }
+}
+
+async function fetchMempoolTxs(contractAddress: string): Promise<HiroTx[]> {
+  const url = `${HIRO_API}/extended/v1/address/${contractAddress}/mempool?limit=50`
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.results || []).filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (tx: any) => tx.tx_type === 'contract_call' && tx.contract_call
+    )
+  } catch {
+    return []
   }
 }
 
@@ -554,6 +577,9 @@ async function doScan(now: number): Promise<void> {
 
     totalTxsIndexed += newTxs
 
+    // Scan mempool for pending bets (ephemeral — refreshed every scan)
+    await scanMempool(contractAddress)
+
     // Enrich unresolved rounds with on-chain data
     await enrichUnresolvedRounds()
 
@@ -567,6 +593,57 @@ async function doScan(now: number): Promise<void> {
     }
   } catch (e) {
     console.error('[round-indexer] Scan error:', e instanceof Error ? e.message : e)
+  }
+}
+
+/**
+ * Scan mempool for pending place-bet txs.
+ * Mempool bets are ephemeral: old pending bets are removed each scan,
+ * then current mempool bets are re-added. Once confirmed, they'll be
+ * picked up by the main scan and marked as 'success'.
+ */
+async function scanMempool(contractAddress: string): Promise<void> {
+  try {
+    // 1. Remove old pending bets from all rounds
+    for (const round of roundsIndex.values()) {
+      const hadPending = round.bets.some((b) => b.status === 'pending')
+      if (hadPending) {
+        round.bets = round.bets.filter((b) => b.status !== 'pending')
+        recalcRoundTotals(round)
+      }
+    }
+
+    // 2. Fetch current mempool
+    const mempoolTxs = await fetchMempoolTxs(contractAddress)
+    let added = 0
+
+    for (const tx of mempoolTxs) {
+      if (tx.contract_call.function_name !== 'place-bet') continue
+
+      const parsed = parsePlaceBetTx(tx)
+      if (!parsed) continue
+
+      const round = ensureRound(parsed.roundId)
+      // Force status to pending for mempool txs
+      parsed.bet.status = 'pending'
+      // Use receipt_time as timestamp if block_time is 0
+      if (!parsed.bet.timestamp) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        parsed.bet.timestamp = (tx as any).receipt_time || Math.floor(Date.now() / 1000)
+      }
+
+      if (!round.bets.some((b) => b.txId === parsed.bet.txId)) {
+        round.bets.push(parsed.bet)
+        recalcRoundTotals(round)
+        added++
+      }
+    }
+
+    if (added > 0) {
+      console.log(`[round-indexer] Mempool: added ${added} pending bet(s)`)
+    }
+  } catch (e) {
+    console.error('[round-indexer] Mempool scan error:', e instanceof Error ? e.message : e)
   }
 }
 

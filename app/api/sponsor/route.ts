@@ -5,7 +5,7 @@ import {
   broadcastTransaction,
   PayloadType,
 } from '@stacks/transactions'
-import { generateWallet } from '@stacks/wallet-sdk'
+import { generateWallet, getStxAddress } from '@stacks/wallet-sdk'
 import {
   getSponsorNonce,
   setSponsorNonce,
@@ -29,8 +29,9 @@ const ALLOWED_FUNCTIONS = [
   'mint',
 ]
 
-// Cache da private key do sponsor (derivada uma vez)
+// Cache da private key + address do sponsor (derivada uma vez)
 let sponsorKeyCache: string | null = null
+let sponsorAddressCache: string | null = null
 
 async function getSponsorPrivateKey(): Promise<string> {
   if (sponsorKeyCache) return sponsorKeyCache
@@ -41,6 +42,7 @@ async function getSponsorPrivateKey(): Promise<string> {
   const wallet = await generateWallet({ secretKey: mnemonic, password: '' })
   const account = wallet.accounts[0]
   sponsorKeyCache = account.stxPrivateKey
+  sponsorAddressCache = getStxAddress({ account, network: 'testnet' })
   return sponsorKeyCache
 }
 
@@ -109,6 +111,22 @@ export async function POST(req: NextRequest) {
     // 3. Sponsora a transacao (with tracked nonce if available)
     const sponsorPrivateKey = await getSponsorPrivateKey()
 
+    // Detect if origin == sponsor (deployer betting on their own account).
+    // In this case, ONE tx consumes TWO nonces from the same account:
+    // the origin nonce (user) AND the sponsor nonce.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const originAuth = (transaction.auth as any)?.spendingCondition ?? (transaction.auth as any)?.originCondition
+    const originSignerHash = originAuth?.signer as string | undefined
+
+    let isSelfSponsored = false
+    if (originSignerHash && sponsorAddressCache) {
+      try {
+        const { c32addressDecode } = await import('c32check')
+        const [, sponsorHash] = c32addressDecode(sponsorAddressCache)
+        isSelfSponsored = originSignerHash.toLowerCase() === sponsorHash.toLowerCase()
+      } catch { /* fall through — treat as not self-sponsored */ }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sponsorOpts: any = {
       transaction,
@@ -117,10 +135,18 @@ export async function POST(req: NextRequest) {
       network: 'testnet',
     }
 
-    // Use tracked sponsor nonce from KV if recent enough
-    const tracked = await getSponsorNonce()
-    if (tracked) {
-      sponsorOpts.sponsorNonce = tracked.nonce
+    if (isSelfSponsored) {
+      // When origin == sponsor, sponsor nonce must be origin nonce + 1
+      // (both nonces come from the same account counter)
+      const originNonce = BigInt(originAuth?.nonce ?? 0)
+      sponsorOpts.sponsorNonce = originNonce + BigInt(1)
+      console.log(`[sponsor] Self-sponsored: origin nonce=${originNonce}, sponsor nonce=${originNonce + BigInt(1)}`)
+    } else {
+      // Use tracked sponsor nonce from KV if recent enough
+      const tracked = await getSponsorNonce()
+      if (tracked) {
+        sponsorOpts.sponsorNonce = tracked.nonce
+      }
     }
 
     const sponsoredTx = await sponsorTransaction(sponsorOpts)
@@ -139,8 +165,10 @@ export async function POST(req: NextRequest) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const auth = sponsoredTx.auth as any
-        const usedNonce = BigInt(auth.sponsorSpendingCondition?.nonce ?? auth.sponsorCondition?.nonce ?? 0)
-        await setSponsorNonce(usedNonce + BigInt(1))
+        const usedSponsorNonce = BigInt(auth.sponsorSpendingCondition?.nonce ?? auth.sponsorCondition?.nonce ?? 0)
+        // When self-sponsored, 2 nonces are consumed (origin + sponsor),
+        // so next available = sponsor_nonce + 1 = origin_nonce + 2
+        await setSponsorNonce(usedSponsorNonce + BigInt(1))
       } catch {
         await clearSponsorNonce()
       }
