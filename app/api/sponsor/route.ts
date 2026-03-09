@@ -151,6 +151,11 @@ export async function POST(req: NextRequest) {
 
     const sponsoredTx = await sponsorTransaction(sponsorOpts)
 
+    // Log nonces for debugging
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const debugAuth = sponsoredTx.auth as any
+    console.log(`[sponsor] Nonces: origin=${debugAuth.spendingCondition?.nonce}, sponsor=${debugAuth.sponsorSpendingCondition?.nonce}, self=${isSelfSponsored}`)
+
     // 4. Broadcasta
     const result = await broadcastTransaction({
       transaction: sponsoredTx,
@@ -161,9 +166,10 @@ export async function POST(req: NextRequest) {
     // ALSO include txid alongside error/reason fields. Must check error first!
     if ('error' in result) {
       await clearSponsorNonce()
+      const r = result as Record<string, unknown>
       console.error('[sponsor] Broadcast rejected:', JSON.stringify(result))
       return NextResponse.json(
-        { error: (result as Record<string, unknown>).error, reason: (result as Record<string, unknown>).reason },
+        { error: r.error, reason: r.reason, reason_data: r.reason_data },
         { status: 400 }
       )
     }
