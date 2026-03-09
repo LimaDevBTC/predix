@@ -135,101 +135,116 @@ export async function POST(req: NextRequest) {
       network: 'testnet',
     }
 
+    // --- Determine initial sponsor nonce ---
+    let sponsorNonce: bigint | undefined
+
     if (isSelfSponsored) {
-      // When origin == sponsor, sponsor nonce must be origin nonce + 1
-      // (both nonces come from the same account counter)
       const originNonce = BigInt(originAuth?.nonce ?? 0)
-      sponsorOpts.sponsorNonce = originNonce + BigInt(1)
-      console.log(`[sponsor] Self-sponsored: origin nonce=${originNonce}, sponsor nonce=${originNonce + BigInt(1)}`)
+      sponsorNonce = originNonce + BigInt(1)
+      console.log(`[sponsor] Self-sponsored: origin nonce=${originNonce}, sponsor nonce=${sponsorNonce}`)
     } else {
-      // Use tracked sponsor nonce from KV if recent enough
       const tracked = await getSponsorNonce()
       if (tracked) {
-        sponsorOpts.sponsorNonce = tracked.nonce
-      } else {
-        // KV expired — fetch from extended API (accounts for mempool txs)
-        // The default fetchNonce in @stacks/transactions uses /v2/accounts/ which
-        // only sees confirmed state, causing ConflictingNonceInMempool with ghost txs.
-        try {
-          const nonceRes = await fetch(
-            `https://api.testnet.hiro.so/extended/v1/address/${sponsorAddressCache}/nonces`
-          )
-          const nonceData = await nonceRes.json()
-          sponsorOpts.sponsorNonce = BigInt(nonceData.possible_next_nonce)
-          console.log(`[sponsor] Fetched sponsor nonce from extended API: ${nonceData.possible_next_nonce}`)
-        } catch (e) {
-          console.warn('[sponsor] Failed to fetch nonce from extended API, falling back to auto-fetch')
-        }
+        sponsorNonce = tracked.nonce
+        console.log(`[sponsor] Using KV tracked nonce: ${sponsorNonce}`)
       }
+      // If no tracked nonce, sponsorTransaction will auto-fetch; we'll correct via retry if needed
     }
 
-    const sponsoredTx = await sponsorTransaction(sponsorOpts)
-
-    // Log nonces for debugging
+    // --- Sponsor + Broadcast with retry on nonce errors ---
+    const MAX_RETRIES = 3
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const debugAuth = sponsoredTx.auth as any
-    console.log(`[sponsor] Nonces: origin=${debugAuth.spendingCondition?.nonce}, sponsor=${debugAuth.sponsorSpendingCondition?.nonce}, self=${isSelfSponsored}`)
+    let lastResult: any = null
 
-    // 4. Broadcasta
-    const result = await broadcastTransaction({
-      transaction: sponsoredTx,
-      network: 'testnet',
-    })
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const opts: any = { ...sponsorOpts }
+      if (sponsorNonce !== undefined) {
+        opts.sponsorNonce = sponsorNonce
+      }
 
-    // v7: broadcastTransaction returns { txid } on success, BUT rejected txs
-    // ALSO include txid alongside error/reason fields. Must check error first!
-    if ('error' in result) {
-      await clearSponsorNonce()
-      const r = result as Record<string, unknown>
-      console.error('[sponsor] Broadcast rejected:', JSON.stringify(result))
-      return NextResponse.json(
-        { error: r.error, reason: r.reason, reason_data: r.reason_data },
-        { status: 400 }
-      )
-    }
+      const sponsoredTx = await sponsorTransaction(opts)
 
-    if ('txid' in result) {
-      console.log('[sponsor] Broadcast OK:', result.txid)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const auth = sponsoredTx.auth as any
+      const usedOriginNonce = auth.spendingCondition?.nonce
+      const usedSponsorNonce = auth.sponsorSpendingCondition?.nonce
+      console.log(`[sponsor] Attempt ${attempt}: origin=${usedOriginNonce}, sponsor=${usedSponsorNonce}, self=${isSelfSponsored}`)
 
-      // Track next sponsor nonce in KV
-      try {
+      const result = await broadcastTransaction({ transaction: sponsoredTx, network: 'testnet' })
+
+      // Check for broadcast errors
+      if ('error' in result) {
+        const r = result as Record<string, unknown>
+        const reason = r.reason as string
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const auth = sponsoredTx.auth as any
-        const usedSponsorNonce = BigInt(auth.sponsorSpendingCondition?.nonce ?? auth.sponsorCondition?.nonce ?? 0)
-        // When self-sponsored, 2 nonces are consumed (origin + sponsor),
-        // so next available = sponsor_nonce + 1 = origin_nonce + 2
-        await setSponsorNonce(usedSponsorNonce + BigInt(1))
-      } catch {
-        await clearSponsorNonce()
-      }
+        const reasonData = r.reason_data as any
 
-      // Server-side optimistic KV write for place-bet — guarantees all clients
-      // see the bet even if the client's fire-and-forget POST to /api/pool-update fails.
-      // Uses txid as tradeId for dedup (client pool-update uses same txid).
-      if (functionName === 'place-bet') {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const funcArgs = (payload as any).functionArgs
-          if (Array.isArray(funcArgs) && funcArgs.length >= 3) {
-            const roundId = Number(funcArgs[0]?.value ?? 0)
-            const side = String(funcArgs[1]?.value ?? '').toUpperCase()
-            const amountMicro = Number(funcArgs[2]?.value ?? 0)
-            if (roundId > 0 && (side === 'UP' || side === 'DOWN') && amountMicro > 0) {
-              await addOptimisticBet(roundId, side as 'UP' | 'DOWN', amountMicro, result.txid)
-              console.log(`[sponsor] KV optimistic: round=${roundId} ${side} $${(amountMicro / 1e6).toFixed(2)} txid=${result.txid}`)
-            }
+        // Retry on nonce errors — use the expected nonce from the error
+        if ((reason === 'BadNonce' || reason === 'ConflictingNonceInMempool') && attempt < MAX_RETRIES) {
+          if (reasonData?.expected != null) {
+            sponsorNonce = BigInt(reasonData.expected)
+            console.log(`[sponsor] Nonce error (${reason}), retrying with nonce=${sponsorNonce}`)
+            continue
           }
-        } catch (kvErr) {
-          console.warn('[sponsor] KV optimistic write failed (non-fatal):', kvErr)
+          // ConflictingNonceInMempool doesn't always have expected — try incrementing
+          if (sponsorNonce !== undefined) {
+            sponsorNonce += BigInt(1)
+            console.log(`[sponsor] Nonce conflict, retrying with nonce=${sponsorNonce}`)
+            continue
+          }
         }
+
+        // Non-retryable error
+        await clearSponsorNonce()
+        console.error('[sponsor] Broadcast rejected:', JSON.stringify(result))
+        return NextResponse.json(
+          { error: r.error, reason, reason_data: reasonData },
+          { status: 400 }
+        )
       }
 
-      return NextResponse.json({ txid: result.txid })
+      // Success!
+      if ('txid' in result) {
+        console.log('[sponsor] Broadcast OK:', result.txid)
+
+        // Track next sponsor nonce
+        try {
+          const finalSponsorNonce = BigInt(usedSponsorNonce ?? 0)
+          await setSponsorNonce(finalSponsorNonce + BigInt(1))
+        } catch {
+          await clearSponsorNonce()
+        }
+
+        // Optimistic KV write for place-bet
+        if (functionName === 'place-bet') {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const funcArgs = (payload as any).functionArgs
+            if (Array.isArray(funcArgs) && funcArgs.length >= 3) {
+              const roundId = Number(funcArgs[0]?.value ?? 0)
+              const side = String(funcArgs[1]?.value ?? '').toUpperCase()
+              const amountMicro = Number(funcArgs[2]?.value ?? 0)
+              if (roundId > 0 && (side === 'UP' || side === 'DOWN') && amountMicro > 0) {
+                await addOptimisticBet(roundId, side as 'UP' | 'DOWN', amountMicro, result.txid)
+                console.log(`[sponsor] KV optimistic: round=${roundId} ${side} $${(amountMicro / 1e6).toFixed(2)} txid=${result.txid}`)
+              }
+            }
+          } catch (kvErr) {
+            console.warn('[sponsor] KV optimistic write failed (non-fatal):', kvErr)
+          }
+        }
+
+        return NextResponse.json({ txid: result.txid })
+      }
+
+      lastResult = result
+      break
     }
 
-    // Unexpected result shape
+    // Exhausted retries or unexpected result
     await clearSponsorNonce()
-    console.error('[sponsor] Unexpected broadcast result:', result)
+    console.error('[sponsor] Unexpected broadcast result:', lastResult)
     return NextResponse.json({ error: 'Unexpected broadcast result' }, { status: 500 })
   } catch (err: unknown) {
     await clearSponsorNonce()
