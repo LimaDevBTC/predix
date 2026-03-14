@@ -310,6 +310,41 @@ export async function getOptimisticEarlyBets(roundId: number): Promise<{ earlyUp
 }
 
 // ---------------------------------------------------------------------------
+// Projected jackpot balance (optimistic, written by cron after claims)
+// ---------------------------------------------------------------------------
+
+/**
+ * After cron resolves a round, it knows the volume and can project the new
+ * jackpot balance (current + 1% of winning payout fees). This projection is
+ * stored in Redis so the UI can show the updated value immediately, without
+ * waiting for the on-chain claim tx to confirm (~30s-2min).
+ *
+ * The API /round uses max(on-chain, projected) so it's never stale.
+ * TTL: 5 minutes (on-chain catches up well before that).
+ */
+export async function setProjectedJackpot(balanceMicro: number): Promise<void> {
+  const kv = getRedis()
+  if (!kv) return
+  try {
+    await kv.set('jackpot-projected', balanceMicro, { ex: 300 })
+  } catch (err) {
+    console.warn('[pool-store] jackpot-projected write failed:', (err as Error).message)
+  }
+}
+
+export async function getProjectedJackpot(): Promise<number> {
+  const kv = getRedis()
+  if (!kv) return 0
+  try {
+    const val = await kv.get<number>('jackpot-projected')
+    return val ?? 0
+  } catch (err) {
+    console.warn('[pool-store] jackpot-projected read failed:', (err as Error).message)
+    return 0
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Active users (heartbeat via ZSET — score = unix timestamp)
 // ---------------------------------------------------------------------------
 

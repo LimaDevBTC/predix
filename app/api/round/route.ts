@@ -1,7 +1,7 @@
 import { getOrCreateCurrentRound } from '@/lib/rounds'
 import { fetchBtcPriceUsd } from '@/lib/btc-price'
 import { getPriceUp, getPriceDown } from '@/lib/amm'
-import { getOptimisticPool, getRecentTrades, getOpenPrice, heartbeatAndCount, getOptimisticEarlyBets } from '@/lib/pool-store'
+import { getOptimisticPool, getRecentTrades, getOpenPrice, heartbeatAndCount, getOptimisticEarlyBets, getProjectedJackpot } from '@/lib/pool-store'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
       const roundId = Math.floor(Date.now() / 1000 / 60)
 
       // Fetch KV (fast, ~1-5ms) and on-chain (slow, cached) in parallel
-      const [optimistic, recentTrades, serverOpenPrice, onChain, activeUsers, jackpotOnChain, jackpotKV] = await Promise.all([
+      const [optimistic, recentTrades, serverOpenPrice, onChain, activeUsers, jackpotOnChain, jackpotKV, projectedJackpot] = await Promise.all([
         getOptimisticPool(roundId),
         getRecentTrades(roundId),
         getOpenPrice(roundId),
@@ -184,6 +184,7 @@ export async function GET(request: NextRequest) {
         sid ? heartbeatAndCount(sid) : Promise.resolve(0),
         getJackpotData(roundId),
         getOptimisticEarlyBets(roundId),
+        getProjectedJackpot(),
       ])
 
       const totalUp = Math.max(onChain.up, optimistic.up)
@@ -219,7 +220,7 @@ export async function GET(request: NextRequest) {
         activeUsers,
         kvConnected: optimistic._kvConnected ?? true,
         jackpot: {
-          balance: jackpotOnChain.balance / 1e6,
+          balance: Math.max(jackpotOnChain.balance, projectedJackpot) / 1e6,
           earlyUp: Math.max(jackpotOnChain.earlyUp, jackpotKV.earlyUp) / 1e6,
           earlyDown: Math.max(jackpotOnChain.earlyDown, jackpotKV.earlyDown) / 1e6,
         },

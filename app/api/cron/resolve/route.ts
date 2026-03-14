@@ -18,6 +18,7 @@ import {
   clearSponsorNonce,
   acquireSponsorLock,
   releaseSponsorLock,
+  setProjectedJackpot,
 } from '@/lib/pool-store'
 
 export const dynamic = 'force-dynamic'
@@ -264,6 +265,26 @@ async function readUserBets(roundId: number, bettor: string): Promise<{ up: BetD
   }
 }
 
+async function readJackpotBalance(): Promise<number> {
+  try {
+    const data = await fetchJson(
+      `${HIRO_API}/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/get-jackpot-balance`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: CONTRACT_ADDRESS, arguments: [] }),
+      }
+    )
+    if (!data.result) return 0
+    const cv = hexToCV(data.result as string)
+    const json = cvToJSON(cv)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return Number((json as any).value ?? 0)
+  } catch {
+    return 0
+  }
+}
+
 // ---------------------------------------------------------------------------
 // PYTH PRICES
 // ---------------------------------------------------------------------------
@@ -389,6 +410,7 @@ async function processRound(
   log.push({ action: 'bettors', detail: `${bettors.length} bettor(s) found` })
 
   // 5. Claim on behalf of each bettor
+  let claimedAny = false
   for (const bettor of bettors) {
     const userBets = await readUserBets(roundId, bettor)
 
@@ -420,9 +442,31 @@ async function processRound(
         log.push({ action: 'claim-on-behalf', detail: `${bettor.slice(0, 8)}... ${side}`, txId })
         await waitForMempool(txId)
         currentNonce = nextNonce
+        claimedAny = true
       } catch (e) {
         log.push({ action: 'error', detail: `claim-on-behalf ${bettor.slice(0, 8)}... ${side}`, error: String(e) })
       }
+    }
+  }
+
+  // 6. Project jackpot balance for instant UI update
+  //    After claims, jackpot-balance on-chain changes by approximately:
+  //    +1% of total pool (jackpot fee from winning payouts)
+  //    -bonus distributed to early winners (from previous snapshot)
+  //    Net effect is roughly +1% of pool for the next round's display.
+  //    This projection is stored in Redis so the UI doesn't show stale data
+  //    while waiting for on-chain claim txs to confirm (~30s-2min).
+  if (claimedAny && priceStart !== priceEnd) {
+    try {
+      const totalPool = round.totalUp + round.totalDown
+      const jackpotFee = Math.floor(totalPool / 100) // 1% of total pool
+      // Read current on-chain balance as baseline
+      const currentBalance = await readJackpotBalance()
+      const projected = currentBalance + jackpotFee
+      await setProjectedJackpot(projected)
+      log.push({ action: 'jackpot-projected', detail: `${currentBalance} + ${jackpotFee} = ${projected} (${(projected / 1e6).toFixed(2)} USDCx)` })
+    } catch (e) {
+      log.push({ action: 'warn', detail: 'Failed to project jackpot', error: String(e) })
     }
   }
 
