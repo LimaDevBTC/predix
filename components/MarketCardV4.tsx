@@ -1027,7 +1027,10 @@ export function MarketCardV4() {
         {(() => {
           const needsApproval = stxAddress && !checkingAllowance && tradingEnabled === false
           const isChecking = stxAddress && checkingAllowance
-          const needsMint = stxAddress && tradingEnabled === true && tokenBalance === 0 && canMint
+          // Don't show mint overlay if user already has bets in this round (balance may be
+          // temporarily stale while the on-chain tx confirms — showing mint would block trading)
+          const hasActiveBets = roundBets && roundBets.roundId === round?.id && (roundBets.up > 0 || roundBets.down > 0)
+          const needsMint = stxAddress && tradingEnabled === true && tokenBalance === 0 && canMint && !hasActiveBets
           const showOverlay = needsApproval || isChecking || needsMint
           return (
             <div className="relative">
