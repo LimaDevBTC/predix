@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const HIRO_API = 'https://api.testnet.hiro.so'
+import { HIRO_API, hiroHeaders } from '@/lib/hiro'
 const FETCH_TIMEOUT = 10000 // 10 seconds
 
 /**
@@ -49,10 +49,7 @@ export async function POST(req: Request) {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
+      headers: hiroHeaders(),
       body: JSON.stringify({
         sender: sender || contractAddr,
         arguments: args || []

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const CONTRACT_ID = process.env.NEXT_PUBLIC_TEST_USDCX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx'
-const HIRO_TESTNET = 'https://api.testnet.hiro.so'
+import { HIRO_API as HIRO_TESTNET, hiroHeaders } from '@/lib/hiro'
 
 // Cache server-side para evitar 429 da Hiro API
 // Key: address, Value: { data, timestamp }
@@ -22,7 +22,7 @@ async function callContract(contractId: string, functionName: string, args: stri
 
   const response = await fetch(`${HIRO_TESTNET}/v2/contracts/call-read/${contractAddress}/${contractName}/${functionName}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: hiroHeaders(),
     body: JSON.stringify({ sender, arguments: args })
   })
 

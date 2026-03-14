@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const HIRO_TESTNET = 'https://api.testnet.hiro.so'
+import { HIRO_API as HIRO_TESTNET, hiroHeaders } from '@/lib/hiro'
 const TOKEN_CONTRACT = process.env.NEXT_PUBLIC_TEST_USDCX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx'
-const BITPREDIX_CONTRACT = process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv1'
+const BITPREDIX_CONTRACT = process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv2'
 const FETCH_TIMEOUT = 15000
 
 /**
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
       `${HIRO_TESTNET}/v2/map_entry/${tokenAddr}/${tokenName}/allowances`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: hiroHeaders(),
         body: `"${keyHex}"`,
         signal: controller.signal
       }

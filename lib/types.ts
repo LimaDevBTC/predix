@@ -43,6 +43,12 @@ export interface Trade {
   timestamp: number
 }
 
+export interface JackpotState {
+  balance: number     // Saldo atual do jackpot em USD
+  earlyUp: number     // Early bets em UP neste round (USD)
+  earlyDown: number   // Early bets em DOWN neste round (USD)
+}
+
 /** Resposta da API de preço do Bitcoin */
 export interface BtcPriceResponse {
   usd: number

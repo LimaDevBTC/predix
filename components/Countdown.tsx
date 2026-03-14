@@ -38,12 +38,21 @@ export function Countdown({ endsAt, serverTimeSkew = 0, onEnd, onTick, className
 
   const m = Math.floor(secs / 60)
   const s = secs % 60
+  const isEarlyWindow = secs > 40 // primeiros 0-20s do round (60 - 20 = 40)
   const urgent = secs > 0 && secs <= 20
   const ended = secs === 0
 
   return (
     <span
-      className={`font-mono tabular-nums ${className} ${urgent ? 'text-red-400 animate-pulse' : ended ? 'text-zinc-500' : ''}`}
+      className={`font-mono tabular-nums ${className} ${
+        isEarlyWindow
+          ? 'text-yellow-400'
+          : urgent
+            ? 'text-red-400 animate-pulse'
+            : ended
+              ? 'text-zinc-500'
+              : ''
+      }`}
     >
       {ended ? '0:00' : `${m}:${s.toString().padStart(2, '0')}`}
     </span>

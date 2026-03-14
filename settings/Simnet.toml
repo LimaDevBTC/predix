@@ -7,6 +7,7 @@
 
 [network]
 name = "simnet"
+epoch = "3.0"
 
 [accounts.deployer]
 mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"

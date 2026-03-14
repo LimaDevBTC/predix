@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getWalletProfile } from '@/lib/round-indexer'
+import { HIRO_API, hiroHeaders } from '@/lib/hiro'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -21,14 +22,13 @@ export async function GET(req: Request) {
 
     let balance = 0
     try {
-      const HIRO_API = 'https://api.testnet.hiro.so'
       const CONTRACT_ADDRESS = 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK'
       const { cvToHex, standardPrincipalCV, hexToCV, cvToJSON } = await import('@stacks/transactions')
       const res = await fetch(
         `${HIRO_API}/v2/contracts/call-read/${CONTRACT_ADDRESS}/test-usdcx/get-balance`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: hiroHeaders(),
           body: JSON.stringify({
             sender: CONTRACT_ADDRESS,
             arguments: [cvToHex(standardPrincipalCV(address))],

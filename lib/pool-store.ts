@@ -272,6 +272,44 @@ export async function releaseSponsorLock(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Jackpot: optimistic early bet tracking
+// ---------------------------------------------------------------------------
+
+export async function addOptimisticEarlyBet(
+  roundId: number,
+  side: 'UP' | 'DOWN',
+  amountMicro: number,
+): Promise<void> {
+  const kv = getRedis()
+  if (!kv) return
+  try {
+    const field = side === 'UP' ? 'early-up' : 'early-down'
+    const pipe = kv.pipeline()
+    pipe.hincrby(`jackpot:${roundId}`, field, amountMicro)
+    pipe.expire(`jackpot:${roundId}`, 300)
+    await pipe.exec()
+  } catch (err) {
+    console.warn('[pool-store] Redis jackpot write failed (non-fatal):', (err as Error).message)
+  }
+}
+
+export async function getOptimisticEarlyBets(roundId: number): Promise<{ earlyUp: number; earlyDown: number }> {
+  const kv = getRedis()
+  if (!kv) return { earlyUp: 0, earlyDown: 0 }
+  try {
+    const data = await kv.hgetall(`jackpot:${roundId}`)
+    if (!data || Object.keys(data).length === 0) return { earlyUp: 0, earlyDown: 0 }
+    return {
+      earlyUp: Number((data as Record<string, unknown>)['early-up'] || 0),
+      earlyDown: Number((data as Record<string, unknown>)['early-down'] || 0),
+    }
+  } catch (err) {
+    console.warn('[pool-store] Redis jackpot read failed:', (err as Error).message)
+    return { earlyUp: 0, earlyDown: 0 }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Active users (heartbeat via ZSET — score = unix timestamp)
 // ---------------------------------------------------------------------------
 

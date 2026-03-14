@@ -18,6 +18,7 @@ interface ResolvedRound {
 interface ResolutionModalProps {
   round: ResolvedRound
   onClose: () => void
+  jackpotBonus?: number
 }
 
 function formatTime(ts: number) {
@@ -31,7 +32,7 @@ function formatTime(ts: number) {
   return `#${year}${month}${day}${hour}${minute}`
 }
 
-export function ResolutionModal({ round, onClose }: ResolutionModalProps) {
+export function ResolutionModal({ round, onClose, jackpotBonus = 0 }: ResolutionModalProps) {
   const [countdown, setCountdown] = useState(5)
   const savedRef = useRef(false)
   const pos = getPositionForRound(round.id)
@@ -156,6 +157,12 @@ export function ResolutionModal({ round, onClose }: ResolutionModalProps) {
                           <span className="text-zinc-500">Payout</span>
                           <span className="font-mono text-zinc-300">${payout.toFixed(2)}</span>
                         </div>
+                        {jackpotBonus > 0 && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-yellow-500">Jackpot Bonus</span>
+                            <span className="font-mono text-yellow-400">+${jackpotBonus.toFixed(2)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-zinc-500">Cost</span>
                           <span className="font-mono text-zinc-400">${totalCost.toFixed(2)}</span>

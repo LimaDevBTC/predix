@@ -13,18 +13,26 @@ import {
   acquireSponsorLock,
   releaseSponsorLock,
   addOptimisticBet,
+  addOptimisticEarlyBet,
 } from '@/lib/pool-store'
 
-// Contratos permitidos para sponsorship
+// Contratos permitidos para sponsorship (predixv2 + gateway + token)
+const GATEWAY_ID = process.env.NEXT_PUBLIC_GATEWAY_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv2-gateway'
 const ALLOWED_CONTRACTS = [
-  process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv1',
+  process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv2',
+  GATEWAY_ID,
   process.env.NEXT_PUBLIC_TEST_USDCX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx',
 ]
 
-// Funcoes permitidas
+// Funcoes permitidas per contract:
+// - gateway: place-bet only
+// - predixv2: claim-round-side, claim-on-behalf, resolve-round
+// - test-usdcx: approve, mint
 const ALLOWED_FUNCTIONS = [
   'place-bet',
   'claim-round-side',
+  'claim-on-behalf',
+  'resolve-round',
   'approve',
   'mint',
 ]
@@ -106,6 +114,44 @@ export async function POST(req: NextRequest) {
         { error: `Function ${functionName} not allowed for sponsorship` },
         { status: 403 }
       )
+    }
+
+    // --- TIMING ENFORCEMENT + EARLY FLAG VALIDATION for place-bet ---
+    if (functionName === 'place-bet') {
+      const now = Date.now()
+      const currentRoundId = Math.floor(now / 1000 / 60)
+      const roundEndMs = (currentRoundId + 1) * 60 * 1000
+      const msUntilEnd = roundEndMs - now
+      const CUTOFF_MS = 10_000 // 10 seconds
+
+      if (msUntilEnd <= CUTOFF_MS) {
+        console.log(`[sponsor] REJECTED place-bet: ${(msUntilEnd / 1000).toFixed(1)}s until round end (cutoff=${CUTOFF_MS / 1000}s)`)
+        return NextResponse.json(
+          { error: 'Trading window closed', reason: 'too_late', secondsLeft: Math.round(msUntilEnd / 1000) },
+          { status: 403 }
+        )
+      }
+
+      // Early flag validation: reject early=true if real clock says >22s into round
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const funcArgs = (payload as any).functionArgs
+      if (Array.isArray(funcArgs) && funcArgs.length >= 4) {
+        const earlyArg = funcArgs[3]?.value === true || String(funcArgs[3]?.value) === 'true'
+        if (earlyArg) {
+          const roundId = Number(funcArgs[0]?.value ?? 0)
+          const roundStartMs = roundId * 60 * 1000
+          const elapsedMs = now - roundStartMs
+          const EARLY_WINDOW_MS = 22_000 // 20s + 2s tolerance for clock skew
+
+          if (elapsedMs > EARLY_WINDOW_MS) {
+            console.log(`[sponsor] REJECTED early=true: ${(elapsedMs / 1000).toFixed(1)}s into round (limit=${EARLY_WINDOW_MS / 1000}s)`)
+            return NextResponse.json(
+              { error: 'Early window expired', reason: 'early_expired' },
+              { status: 403 }
+            )
+          }
+        }
+      }
     }
 
     // 3. Sponsora a transacao (with tracked nonce if available)
@@ -237,6 +283,14 @@ export async function POST(req: NextRequest) {
               if (roundId > 0 && (side === 'UP' || side === 'DOWN') && amountMicro > 0) {
                 await addOptimisticBet(roundId, side as 'UP' | 'DOWN', amountMicro, result.txid)
                 console.log(`[sponsor] KV optimistic: round=${roundId} ${side} $${(amountMicro / 1e6).toFixed(2)} txid=${result.txid}`)
+
+                // Track early bets for jackpot display (KV optimistic — real data is on-chain)
+                const earlyArg = Array.isArray(funcArgs) && funcArgs.length >= 4 &&
+                  (funcArgs[3]?.value === true || String(funcArgs[3]?.value) === 'true')
+                if (earlyArg) {
+                  await addOptimisticEarlyBet(roundId, side as 'UP' | 'DOWN', amountMicro)
+                  console.log(`[sponsor] KV early jackpot: round=${roundId} ${side} $${(amountMicro / 1e6).toFixed(2)}`)
+                }
               }
             }
           } catch (kvErr) {

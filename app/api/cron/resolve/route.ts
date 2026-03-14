@@ -28,8 +28,8 @@ export const maxDuration = 300
 // ---------------------------------------------------------------------------
 
 const CONTRACT_ADDRESS = 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK'
-const CONTRACT_NAME = 'predixv1'
-const HIRO_API = 'https://api.testnet.hiro.so'
+const CONTRACT_NAME = 'predixv2'
+import { HIRO_API, hiroHeaders } from '@/lib/hiro'
 const PYTH_BENCHMARKS = 'https://benchmarks.pyth.network'
 const TX_FEE = BigInt(50000) // 0.05 STX
 
@@ -58,7 +58,10 @@ interface LogEntry {
 // ---------------------------------------------------------------------------
 
 async function fetchJson(url: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
-  const res = await fetch(url, options)
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...hiroHeaders(), ...(options.headers as Record<string, string>) },
+  })
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`)
   return res.json() as Promise<Record<string, unknown>>
 }
@@ -110,7 +113,7 @@ async function broadcastWithRetry(
 
     const res = await fetch(`${HIRO_API}/v2/transactions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
+      headers: hiroHeaders({ 'Content-Type': 'application/octet-stream' }),
       body: binaryTx,
     })
     const text = await res.text()

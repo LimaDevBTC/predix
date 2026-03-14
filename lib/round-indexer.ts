@@ -134,7 +134,7 @@ interface HiroTx {
 
 import { Redis } from '@upstash/redis'
 
-const HIRO_API = 'https://api.testnet.hiro.so'
+import { HIRO_API, hiroHeaders } from '@/lib/hiro'
 const DEPLOYER = 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK'
 const SCAN_PAGE_SIZE = 50
 const MAX_PAGES_PER_SCAN = 20
@@ -144,7 +144,7 @@ const REDIS_CACHE_KEY = 'indexer:cache:v1'
 const REDIS_CACHE_TTL = 3600 // 1 hour
 
 function getContractAddress(): string {
-  return process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || `${DEPLOYER}.predixv1`
+  return process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || `${DEPLOYER}.predixv2`
 }
 
 // ============================================================================
@@ -325,7 +325,7 @@ async function fetchContractTxs(contractAddress: string, limit: number, offset: 
 
   try {
     const res = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: hiroHeaders(),
       signal: controller.signal,
     })
     clearTimeout(timeoutId)
@@ -345,7 +345,7 @@ async function fetchMempoolTxs(contractAddress: string): Promise<HiroTx[]> {
 
   try {
     const res = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: hiroHeaders(),
       signal: controller.signal,
     })
     clearTimeout(timeoutId)
@@ -386,7 +386,7 @@ async function enrichUnresolvedRounds(): Promise<void> {
         `${HIRO_API}/v2/map_entry/${contractAddr}/${contractName}/rounds?proof=0`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          headers: hiroHeaders(),
           body: JSON.stringify(keyHex),
           signal: controller.signal,
         },

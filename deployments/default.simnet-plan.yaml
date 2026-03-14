@@ -22,6 +22,7 @@ genesis:
     - pox-4
     - signers
     - signers-voting
+    - costs-4
 plan:
   batches:
     - id: 0
@@ -30,35 +31,23 @@ plan:
             contract-name: sip-010-trait
             emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
             path: contracts/sip-010-trait.clar
-            clarity-version: 1
+            clarity-version: 2
         - emulated-contract-publish:
             contract-name: test-usdcx
             emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
             path: contracts/test-usdcx.clar
-            clarity-version: 1
+            clarity-version: 2
+      epoch: "2.5"
+    - id: 1
+      transactions:
         - emulated-contract-publish:
-            contract-name: bitpredix
+            contract-name: predixv2
             emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
-            path: contracts/bitpredix.clar
-            clarity-version: 1
+            path: contracts/predixv2.clar
+            clarity-version: 3
         - emulated-contract-publish:
-            contract-name: bitpredix-v3
+            contract-name: predixv2-gateway
             emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
-            path: contracts/bitpredix-v3.clar
-            clarity-version: 1
-        - emulated-contract-publish:
-            contract-name: bitpredix-v5
-            emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
-            path: contracts/bitpredix-v5.clar
-            clarity-version: 1
-        - emulated-contract-publish:
-            contract-name: bitpredix-v6
-            emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
-            path: contracts/bitpredix-v6.clar
-            clarity-version: 1
-        - emulated-contract-publish:
-            contract-name: oracle
-            emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
-            path: contracts/oracle.clar
-            clarity-version: 1
-      epoch: "2.05"
+            path: contracts/predixv2-gateway.clar
+            clarity-version: 3
+      epoch: "3.0"

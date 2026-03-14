@@ -1,14 +1,14 @@
 import { getOrCreateCurrentRound } from '@/lib/rounds'
 import { fetchBtcPriceUsd } from '@/lib/btc-price'
 import { getPriceUp, getPriceDown } from '@/lib/amm'
-import { getOptimisticPool, getRecentTrades, getOpenPrice, heartbeatAndCount } from '@/lib/pool-store'
+import { getOptimisticPool, getRecentTrades, getOpenPrice, heartbeatAndCount, getOptimisticEarlyBets } from '@/lib/pool-store'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
 const ROUND_DURATION_MS = 60 * 1000
-const HIRO_TESTNET = 'https://api.testnet.hiro.so'
+import { HIRO_API as HIRO_TESTNET, hiroHeaders } from '@/lib/hiro'
 const BITPREDIX_ID = process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID
 
 // Virtual seed liquidity for display pricing (must match frontend constant)
@@ -78,7 +78,7 @@ async function getOnChainData(roundId: number): Promise<{ up: number; down: numb
       `${HIRO_TESTNET}/v2/map_entry/${contractAddress}/${contractName}/rounds?proof=0&tip=latest`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: hiroHeaders(),
         body: JSON.stringify(keyHex),
         cache: 'no-store',
         signal: AbortSignal.timeout(4000), // don't let Hiro block us > 4s
@@ -108,6 +108,65 @@ async function getOnChainData(roundId: number): Promise<{ up: number; down: numb
   }
 }
 
+// Cache para jackpot balance (muda a cada claim, cache 5s)
+let jackpotCache: { balance: number; earlyUp: number; earlyDown: number; roundId: number; ts: number } | null = null
+
+async function getJackpotData(roundId: number): Promise<{ balance: number; earlyUp: number; earlyDown: number }> {
+  if (jackpotCache && jackpotCache.roundId === roundId && Date.now() - jackpotCache.ts < HIRO_CACHE_TTL_MS) {
+    return jackpotCache
+  }
+
+  try {
+    const [contractAddress, contractName] = parseContractId(BITPREDIX_ID!)
+    const { deserializeCV, uintCV, cvToHex } = await import('@stacks/transactions')
+
+    // 1. Fetch jackpot balance
+    const balRes = await fetch(
+      `${HIRO_TESTNET}/v2/contracts/call-read/${contractAddress}/${contractName}/get-jackpot-balance`,
+      {
+        method: 'POST',
+        headers: { ...hiroHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: contractAddress, arguments: [] }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(4000),
+      }
+    )
+    const balJson = await balRes.json() as { okay: boolean; result?: string }
+    let balance = 0
+    if (balJson.okay && balJson.result) {
+      const cv = deserializeCV(balJson.result) as unknown as { value?: bigint }
+      balance = Number(cv?.value ?? 0)
+    }
+
+    // 2. Fetch round-jackpot
+    const rjRes = await fetch(
+      `${HIRO_TESTNET}/v2/contracts/call-read/${contractAddress}/${contractName}/get-round-jackpot`,
+      {
+        method: 'POST',
+        headers: { ...hiroHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: contractAddress, arguments: [cvToHex(uintCV(roundId))] }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(4000),
+      }
+    )
+    const rjJson = await rjRes.json() as { okay: boolean; result?: string }
+    let earlyUp = 0, earlyDown = 0
+    if (rjJson.okay && rjJson.result) {
+      const cv = deserializeCV(rjJson.result) as unknown as { data?: Record<string, { value?: bigint }> }
+      earlyUp = Number(cv?.data?.['early-up']?.value ?? 0)
+      earlyDown = Number(cv?.data?.['early-down']?.value ?? 0)
+    }
+
+    const result = { balance, earlyUp, earlyDown, roundId, ts: Date.now() }
+    jackpotCache = result
+    return result
+  } catch (err) {
+    console.warn('[round] Jackpot data fetch failed:', (err as Error).message)
+    if (jackpotCache) return jackpotCache
+    return { balance: 0, earlyUp: 0, earlyDown: 0 }
+  }
+}
+
 /** GET: obter rodada atual e precos. */
 export async function GET(request: NextRequest) {
   try {
@@ -117,12 +176,14 @@ export async function GET(request: NextRequest) {
       const roundId = Math.floor(Date.now() / 1000 / 60)
 
       // Fetch KV (fast, ~1-5ms) and on-chain (slow, cached) in parallel
-      const [optimistic, recentTrades, serverOpenPrice, onChain, activeUsers] = await Promise.all([
+      const [optimistic, recentTrades, serverOpenPrice, onChain, activeUsers, jackpotOnChain, jackpotKV] = await Promise.all([
         getOptimisticPool(roundId),
         getRecentTrades(roundId),
         getOpenPrice(roundId),
         getOnChainData(roundId),
         sid ? heartbeatAndCount(sid) : Promise.resolve(0),
+        getJackpotData(roundId),
+        getOptimisticEarlyBets(roundId),
       ])
 
       const totalUp = Math.max(onChain.up, optimistic.up)
@@ -157,6 +218,11 @@ export async function GET(request: NextRequest) {
         openPrice: serverOpenPrice,
         activeUsers,
         kvConnected: optimistic._kvConnected ?? true,
+        jackpot: {
+          balance: jackpotOnChain.balance / 1e6,
+          earlyUp: Math.max(jackpotOnChain.earlyUp, jackpotKV.earlyUp) / 1e6,
+          earlyDown: Math.max(jackpotOnChain.earlyDown, jackpotKV.earlyDown) / 1e6,
+        },
         ok: true,
       })
     }

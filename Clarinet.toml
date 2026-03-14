@@ -1,33 +1,26 @@
 # Bitpredix — Stacks testnet
-# Ref: docs/PLANO_TESTNET_STACKS.md, docs/PRE_DEPLOY_TESTNET.md
 
 [project]
 name = "bitpredix"
-description = "Prediction market BTC preço no próximo minuto"
+description = "Prediction market BTC price next minute"
 authors = []
-# Quando test-usdcx existir, adicionar:
-# requirements = ["ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.sip-010-trait-ft-standard"]
 
 [contracts.sip-010-trait]
 path = "contracts/sip-010-trait.clar"
-# Deploy em testnet primeiro (test-usdcx impl-trait .sip-010-trait).
+clarity_version = 2
+epoch = "2.5"
 
 [contracts.test-usdcx]
 path = "contracts/test-usdcx.clar"
-# Depende de .sip-010-trait (deployamos o nosso em testnet primeiro). Sem requirements externo.
+clarity_version = 2
+epoch = "2.5"
 
-[contracts.oracle]
-path = "contracts/oracle.clar"
+[contracts.predixv2]
+path = "contracts/predixv2.clar"
+clarity_version = 3
+epoch = "3.0"
 
-[contracts.bitpredix]
-path = "contracts/bitpredix.clar"
-
-[contracts.bitpredix-v3]
-path = "contracts/bitpredix-v3.clar"
-# Depende de: .oracle e .test-usdcx (TOKEN); ordem deploy: test-usdcx → oracle → bitpredix
-
-[contracts.bitpredix-v5]
-path = "contracts/bitpredix-v5.clar"
-
-[contracts.bitpredix-v6]
-path = "contracts/bitpredix-v6.clar"
+[contracts.predixv2-gateway]
+path = "contracts/predixv2-gateway.clar"
+clarity_version = 3
+epoch = "3.0"

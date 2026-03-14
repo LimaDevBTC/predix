@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { getLocalStorage, isConnected, request } from '@stacks/connect'
-import { uintCV, contractPrincipalCV, stringAsciiCV } from '@stacks/transactions'
+import { uintCV, contractPrincipalCV, stringAsciiCV, boolCV } from '@stacks/transactions'
 import { TradeTape, type TradeTapeItem } from './TradeTape'
 import { BtcPrice } from './BtcPrice'
 import { Countdown } from './Countdown'
@@ -17,7 +17,8 @@ import { usePythPrice } from '@/lib/pyth'
 import { sponsoredContractCall, getSavedPublicKey, savePublicKey } from '@/lib/sponsored-tx'
 import confetti from 'canvas-confetti'
 
-const BITPREDIX_CONTRACT = process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv1'
+const BITPREDIX_CONTRACT = process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv2'
+const GATEWAY_CONTRACT = process.env.NEXT_PUBLIC_GATEWAY_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv2-gateway'
 const TOKEN_CONTRACT = process.env.NEXT_PUBLIC_TEST_USDCX_CONTRACT_ID || 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx'
 const MAX_APPROVE_AMOUNT = BigInt('1000000000000') // 1 million USD (6 decimals)
 
@@ -90,6 +91,9 @@ export function MarketCardV4() {
   const [stxAddress, setStxAddress] = useState<string | null>(null)
   const [btcPriceHistory, setBtcPriceHistory] = useState<BtcPricePoint[]>([])
   const [pool, setPool] = useState<PoolData | null>(null)
+  const [jackpot, setJackpot] = useState<{ balance: number; earlyUp: number; earlyDown: number } | null>(null)
+  const [isEarlyBet, setIsEarlyBet] = useState(false)
+  const [earlySecsLeft, setEarlySecsLeft] = useState(0)
   const [recentRounds, setRecentRounds] = useState<{ id: string; outcome: 'UP' | 'DOWN' }[]>([])
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
   const [tradeTape, setTradeTape] = useState<TradeTapeItem[]>([])
@@ -113,6 +117,18 @@ export function MarketCardV4() {
     }
     sessionIdRef.current = sid
   }, [])
+
+  // Timer reativo para countdown da janela de jackpot (primeiros 20s)
+  useEffect(() => {
+    const tick = () => {
+      const roundStartMs = (round?.id ?? 0) * 60 * 1000
+      const elapsed = (Date.now() - roundStartMs) / 1000
+      setEarlySecsLeft(Math.max(0, Math.ceil(20 - elapsed)))
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [round?.id])
 
   // Push a bet into the trade tape (auto-removes after 4s, max 5 visible)
   const pushTradeTape = useCallback((side: 'UP' | 'DOWN', amount: number) => {
@@ -176,6 +192,8 @@ export function MarketCardV4() {
         fetchingOpenForRef.current = null
         setRoundBets(null)
         setPool(null)
+        setJackpot(null)
+        setIsEarlyBet(false)
         setTradeTape([])
         tradeTapeTimersRef.current.forEach(clearTimeout)
         tradeTapeTimersRef.current = []
@@ -328,6 +346,11 @@ export function MarketCardV4() {
         const { priceUp, priceDown } = calcSeededPrices(up, down)
         return { totalUp: up, totalDown: down, priceUp, priceDown }
       })
+
+      // Extract jackpot data from poll response
+      if (data.jackpot) {
+        setJackpot(data.jackpot)
+      }
 
       // Trade tape from polling with dedup — generous 30s window to handle latency/clock skew
       if (Array.isArray(data.recentTrades)) {
@@ -675,29 +698,39 @@ export function MarketCardV4() {
     setTrading(true)
     setError(null)
 
-    const [bpAddr, bpName] = BITPREDIX_CONTRACT.split('.')
-    if (!bpAddr || !bpName) {
-      setError('Contract not configured')
+    // GATEWAY: place-bet goes through the gateway contract, not predixv2 directly
+    const [gwAddr, gwName] = GATEWAY_CONTRACT.split('.')
+    if (!gwAddr || !gwName) {
+      setError('Gateway contract not configured')
       setTrading(false)
       return
     }
 
     const amountMicro = Math.round(v * 1e6) // 6 decimais
 
+    // Calculate early flag BEFORE calling sponsoredContractCall
+    const roundStartMs = (round.id) * 60 * 1000
+    const isEarly = Date.now() - roundStartMs < 20_000
+
     try {
       const publicKey = await requirePublicKey()
       const txid = await sponsoredContractCall({
-        contractAddress: bpAddr,
-        contractName: bpName,
+        contractAddress: gwAddr,
+        contractName: gwName,
         functionName: 'place-bet',
         functionArgs: [
           uintCV(round.id),
           stringAsciiCV(side),
-          uintCV(amountMicro)
+          uintCV(amountMicro),
+          boolCV(isEarly),
         ],
         publicKey,
       })
       console.log('Bet sponsored & broadcast:', txid)
+
+      if (isEarly) {
+        setIsEarlyBet(true)
+      }
 
       // Sucesso — acumula apostas no round atual (functional updater to avoid stale closure)
       setRoundBets(prev => {
@@ -865,6 +898,7 @@ export function MarketCardV4() {
                 {roundBets.up > 0 && <span className="text-up font-medium">${roundBets.up} UP</span>}
                 {roundBets.up > 0 && roundBets.down > 0 && <span className="text-zinc-600"> | </span>}
                 {roundBets.down > 0 && <span className="text-down font-medium">${roundBets.down} DOWN</span>}
+                {isEarlyBet && <span className="ml-1 text-[9px] text-yellow-400 font-medium uppercase">Jackpot</span>}
               </div>
             ) : isTradingOpen ? (
               <div className="w-full h-full px-4 rounded-lg bg-zinc-800/60 text-zinc-400 text-sm border border-zinc-700/50 flex flex-col justify-center">
@@ -880,6 +914,25 @@ export function MarketCardV4() {
             )}
           </div>
         </div>
+
+        {/* Velocity Jackpot Banner */}
+        {jackpot && (
+          <div className="px-3 py-2 border-b border-zinc-800 bg-gradient-to-r from-yellow-500/5 to-amber-500/5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs text-yellow-500/80 uppercase tracking-wider font-medium">
+                Velocity Jackpot
+              </span>
+              <span className="font-mono text-xs sm:text-sm font-bold text-yellow-400">
+                ${jackpot.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            {earlySecsLeft > 0 && (
+              <p className="text-[9px] sm:text-[10px] text-yellow-500/60 mt-0.5">
+                Bet now for jackpot eligibility — {earlySecsLeft}s left
+              </p>
+            )}
+          </div>
+        )}
 
         {/* BTC Price Chart (full width, Polymarket style) */}
         <div className="relative mb-3 sm:mb-4 rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">

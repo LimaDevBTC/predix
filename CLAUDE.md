@@ -1,446 +1,182 @@
-# BITPREDIX - Guia do Projeto
+# Predix — Prediction Market on Stacks
+
+## Overview
+Prediction market where users bet on 1-minute BTC price movements (UP/DOWN). Built on Stacks testnet with sponsored transactions (users pay zero gas).
 
 ## Stack
-- **Frontend**: Next.js 14 (App Router), React, TailwindCSS
-- **Blockchain**: Stacks (Clarity smart contracts), testnet
-- **Oracle**: Pyth Network (BTC/USD price feed)
-- **Token**: test-usdcx (ERC20-like, 6 decimais)
-- **Wallet**: @stacks/connect
+- **Frontend**: Next.js 14 (App Router), React 19, TailwindCSS
+- **Blockchain**: Stacks testnet (Clarity smart contracts)
+- **Oracle**: Pyth Network (Hermes SSE for live prices, Benchmarks API for historical)
+- **Token**: test-usdcx (SIP-010, 6 decimals)
+- **Wallet**: @stacks/connect (Xverse)
+- **KV Store**: Upstash Redis (optimistic state, nonce tracking, open prices)
+- **Deploy**: Vercel (serverless)
 
-## Contratos Ativos (testnet)
+## Active Contracts (testnet)
+| Contract | Address | Purpose |
+|---|---|---|
+| **predixv1** | `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv1` | Main market (active) |
+| **test-usdcx** | `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx` | Betting token |
+
 - **Deployer**: `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK`
-- **bitpredix-v5**: Contrato principal de mercado preditivo (`.env.local` → `NEXT_PUBLIC_BITPREDIX_CONTRACT_ID`)
-- **test-usdcx**: Token de aposta (6 decimais)
-- **oracle-v2**: Oracle (legado, Pyth via frontend agora)
+- Contract ID configured via `.env.local` → `NEXT_PUBLIC_BITPREDIX_CONTRACT_ID`
+- Previous versions: bitpredix-v5, bitpredix-v6 (deprecated, kept as reference)
 
-## Arquivos Chave
-| Arquivo | Responsabilidade |
+---
+
+## Round Mechanics
+- **Duration**: 60 seconds (`round-id = Math.floor(timestamp / 60)`)
+- **Trading window**: 55 seconds (closes 5s before round end)
+- **Open price**: First-write-wins in Redis (canonical for all clients)
+- **Settlement**: Frontend fetches Pyth prices, first claim resolves round on-chain
+- **Payout**: `(user_amount / winning_pool) * total_pool - 3% fee`
+- **Hedging**: Users can bet UP and DOWN in same round (bets accumulate per side)
+
+## Smart Contract Architecture (`contracts/predixv1.clar`)
+
+### Data Maps
+```clarity
+rounds { round-id: uint }
+  → { total-up, total-down, price-start, price-end, resolved }
+
+bets { round-id: uint, user: principal, side: (string-ascii 4) }
+  → { amount: uint, claimed: bool }
+
+user-pending-rounds { user: principal }
+  → { round-ids: (list 50 uint) }
+
+round-bettors { round-id: uint }
+  → { bettors: (list 200 principal) }
+```
+
+### Public Functions
+- `place-bet(round-id, side, amount)` — Validates timing, transfers tokens, accumulates bet
+- `claim-round-side(round-id, side, price-start, price-end)` — Per-side claim, resolves round if first
+- `claim-on-behalf(round-id, user, side, price-start, price-end)` — Deployer-only auto-claim
+
+### Read-Only Functions
+- `get-bet(round-id, user, side)` — Single bet lookup
+- `get-user-bets(round-id, user)` — Returns both UP and DOWN bets
+- `get-round(round-id)` — Round data
+- `get-user-pending-rounds(user)` — List of unclaimed round IDs
+
+### Constants
+- `MIN_BET = u1000000` (1 USDCx)
+- `FEE_BPS = u300` (3%)
+- `ROUND_DURATION = u60`
+- `TRADING_WINDOW = u55`
+
+---
+
+## Project Structure
+
+### Core Files
+| File | Purpose |
 |---|---|
-| `contracts/bitpredix-v5.clar` | Smart contract ativo (Clarity) |
-| `contracts/bitpredix-v4.clar` | Versao anterior (referencia) |
-| `components/MarketCardV4.tsx` | UI principal de apostas |
-| `components/ClaimButton.tsx` | Botao de claim/settlement |
-| `lib/pyth.ts` | Oracle de precos (Pyth SSE + Benchmarks) |
-| `lib/positions.ts` | Tracking local de posicoes (localStorage) |
-| `app/api/stacks-read/route.ts` | Proxy para Hiro API (read-only calls) |
-| `app/api/pyth-price/route.ts` | Proxy para Pyth Benchmarks (historico) |
-| `app/api/allowance-status/route.ts` | Verifica approve do token |
+| `components/MarketCardV4.tsx` | Main betting UI (~1200 lines) |
+| `components/ClaimButton.tsx` | Claim/settlement button |
+| `lib/pyth.ts` | Pyth price feed (SSE + Benchmarks) |
+| `lib/amm.ts` | LMSR pricing (b = 3000 + volume) |
+| `lib/pool-store.ts` | Upstash Redis KV abstraction |
+| `lib/sponsored-tx.ts` | Sponsored transaction helper |
+| `lib/positions.ts` | localStorage trade tracking |
+| `lib/usePendingRounds.ts` | React hook for pending claims |
+| `lib/types.ts` | TypeScript interfaces |
+| `instrumentation.ts` | Server-side round monitor (captures open price) |
 
-## Mecanica de Rounds
-- Cada round dura **60 segundos** (round-id = `Math.floor(timestamp / 60)`)
-- Trading aberto por **48s** (fecha 12s antes do fim)
-- Settlement: frontend busca precos do Pyth, primeiro claim resolve o round
-- Payout: `(user_amount / winning_pool) * total_pool - 3% fee`
+### API Routes
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/round` | GET | Current round data + pool state (polled every 1s) |
+| `/api/open-price` | GET/POST | Canonical open price (first-write-wins) |
+| `/api/pool-update` | POST | Optimistic bet broadcast to KV |
+| `/api/sponsor` | POST | Sponsor + broadcast signed tx |
+| `/api/stacks-read` | POST | Proxy for read-only contract calls |
+| `/api/allowance-status` | GET | Check token approval status |
+| `/api/mint-status` | GET | Check mint eligibility |
+| `/api/pyth-price` | GET | Historical Pyth OHLC data |
 
----
-
-# TAREFA PENDENTE: Multiplas Apostas por Usuario
-
-## Objetivo
-Permitir que usuarios facam **multiplas apostas por round**, inclusive em **lados opostos** (hedging). Isso e padrao em mercados preditivos (Polymarket, Kalshi, etc).
-
-## Abordagem Escolhida: Opção A
-Mudar a key do map `bets` para `{ round-id, user, side }`. Apostas no **mesmo lado acumulam** valor. Usuario pode apostar em **UP e DOWN** no mesmo round.
-
-## Estado Atual (v5) - O que bloqueia multiplas apostas
-
-### 1. Smart Contract (`contracts/bitpredix-v5.clar`)
-```clarity
-;; LINHA 56-63: Map key usa { round-id, user } → só 1 entrada por usuario
-(define-map bets
-  { round-id: uint, user: principal }
-  { side: (string-ascii 4), amount: uint, claimed: bool }
-)
-
-;; LINHA 92: Rejeita segunda aposta
-(asserts! (is-none existing-bet) ERR_ALREADY_BET)
-```
-
-### 2. Frontend (`components/MarketCardV4.tsx`)
-```typescript
-// LINHA 62: Estado que trava apos 1a aposta
-const [betPlacedRoundId, setBetPlacedRoundId] = useState<number | null>(null)
-
-// LINHA 350: Flag que desabilita botoes
-const alreadyBet = betPlacedRoundId !== null && round !== null && betPlacedRoundId === round.id
-const canTrade = isTradingOpen && stxAddress && !trading && !alreadyBet
-```
-
-### 3. Claim (`components/ClaimButton.tsx`)
-```typescript
-// LINHA 117-126: Busca UMA aposta por round
-functionName: 'get-bet',
-args: [cvToHex(uintCV(roundId)), cvToHex(standardPrincipalCV(stxAddress))]
-```
-
----
-
-## PLANO DE IMPLEMENTACAO
-
-### PASSO 1: Criar contrato `bitpredix-v6.clar`
-
-Copiar `contracts/bitpredix-v5.clar` para `contracts/bitpredix-v6.clar` e aplicar as mudancas abaixo.
-
-#### 1.1 Atualizar SELF
-```clarity
-;; DE:
-(define-constant SELF 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.bitpredix-v5)
-;; PARA:
-(define-constant SELF 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.bitpredix-v6)
-```
-
-#### 1.2 Mudar map `bets` — adicionar `side` na key
-```clarity
-;; DE:
-(define-map bets
-  { round-id: uint, user: principal }
-  { side: (string-ascii 4), amount: uint, claimed: bool }
-)
-
-;; PARA:
-(define-map bets
-  { round-id: uint, user: principal, side: (string-ascii 4) }
-  { amount: uint, claimed: bool }
-)
-```
-> `side` sai do value e vai para a key. Isso permite 2 entradas por usuario por round (uma UP, uma DOWN).
-
-#### 1.3 Reescrever `place-bet` — acumular ao inves de rejeitar
-```clarity
-(define-public (place-bet (round-id uint) (side (string-ascii 4)) (amount uint))
-  (let (
-    (round-start-time (* round-id ROUND_DURATION))
-    (trading-close-time (+ round-start-time TRADING_WINDOW))
-    (current-round-data (default-to
-      { total-up: u0, total-down: u0, price-start: u0, price-end: u0, resolved: false }
-      (map-get? rounds { round-id: round-id })))
-    (existing-bet (map-get? bets { round-id: round-id, user: tx-sender, side: side }))
-    (current-amount (default-to u0 (get amount existing-bet)))
-  )
-    ;; Validacoes
-    (asserts! (or (is-eq side "UP") (is-eq side "DOWN")) ERR_INVALID_SIDE)
-    (asserts! (>= amount MIN_BET) ERR_INVALID_AMOUNT)
-    ;; REMOVIDO: (asserts! (is-none existing-bet) ERR_ALREADY_BET)
-
-    ;; Transfere tokens do usuario para o contrato
-    (try! (contract-call? .test-usdcx transfer-from tx-sender SELF amount none))
-
-    ;; Atualiza totais do round
-    (map-set rounds { round-id: round-id }
-      {
-        total-up: (if (is-eq side "UP")
-          (+ (get total-up current-round-data) amount)
-          (get total-up current-round-data)),
-        total-down: (if (is-eq side "DOWN")
-          (+ (get total-down current-round-data) amount)
-          (get total-down current-round-data)),
-        price-start: (get price-start current-round-data),
-        price-end: (get price-end current-round-data),
-        resolved: (get resolved current-round-data)
-      }
-    )
-
-    ;; Registra/acumula aposta do usuario (side agora e parte da key)
-    (map-set bets { round-id: round-id, user: tx-sender, side: side }
-      { amount: (+ current-amount amount), claimed: false }
-    )
-
-    ;; Adiciona round a lista de pendentes do usuario
-    (try! (add-user-pending-round tx-sender round-id))
-
-    (ok { round-id: round-id, side: side, amount: amount })
-  )
-)
-```
-
-#### 1.4 Reescrever `claim-round` — claim por SIDE
-Renomear para `claim-round-side` e receber o `side` como parametro. Cada lado e claimado separadamente.
-
-```clarity
-(define-public (claim-round-side (round-id uint) (side (string-ascii 4)) (price-start uint) (price-end uint))
-  (let (
-    (user tx-sender)
-    (round-end-time (* (+ round-id u1) ROUND_DURATION))
-    (round-data (default-to
-      { total-up: u0, total-down: u0, price-start: u0, price-end: u0, resolved: false }
-      (map-get? rounds { round-id: round-id })))
-    (bet-data (unwrap! (map-get? bets { round-id: round-id, user: tx-sender, side: side }) ERR_NO_BET))
-  )
-    ;; Validacoes
-    (asserts! (or (is-eq side "UP") (is-eq side "DOWN")) ERR_INVALID_SIDE)
-    (asserts! (not (get claimed bet-data)) ERR_ALREADY_CLAIMED)
-    (asserts! (> price-start u0) ERR_INVALID_PRICES)
-    (asserts! (> price-end u0) ERR_INVALID_PRICES)
-
-    ;; Resolve o round se ainda nao foi resolvido
-    (if (not (get resolved round-data))
-      (map-set rounds { round-id: round-id }
-        (merge round-data { price-start: price-start, price-end: price-end, resolved: true })
-      )
-      true
-    )
-
-    ;; Busca dados atualizados do round
-    (let (
-      (final-round (unwrap-panic (map-get? rounds { round-id: round-id })))
-      (final-price-start (get price-start final-round))
-      (final-price-end (get price-end final-round))
-      (outcome (if (> final-price-end final-price-start) "UP" "DOWN"))
-      (user-won (is-eq side outcome))
-      (total-pool (+ (get total-up final-round) (get total-down final-round)))
-      (winning-pool (if (is-eq outcome "UP")
-        (get total-up final-round)
-        (get total-down final-round)))
-      (user-amount (get amount bet-data))
-    )
-      ;; Marca aposta como claimed
-      (map-set bets { round-id: round-id, user: user, side: side }
-        (merge bet-data { claimed: true })
-      )
-
-      ;; Remove da lista de pendentes SOMENTE se ambos os lados ja foram claimed
-      ;; (ou se o usuario so apostou em um lado)
-      (let (
-        (other-side (if (is-eq side "UP") "DOWN" "UP"))
-        (other-bet (map-get? bets { round-id: round-id, user: user, side: other-side }))
-        (other-claimed (match other-bet ob (get claimed ob) true))
-      )
-        (if other-claimed
-          (begin (remove-user-pending-round user round-id) true)
-          true
-        )
-      )
-
-      ;; Calcula e paga se ganhou
-      (if user-won
-        (if (> winning-pool u0)
-          (let (
-            (gross-payout (/ (* user-amount total-pool) winning-pool))
-            (fee (/ (* gross-payout FEE_BPS) u10000))
-            (net-payout (- gross-payout fee))
-          )
-            (try! (contract-call? .test-usdcx transfer-from SELF user net-payout none))
-            (if (> fee u0)
-              (try! (contract-call? .test-usdcx transfer-from SELF FEE_RECIPIENT fee none))
-              true
-            )
-            (ok { won: true, payout: net-payout, outcome: outcome, price-start: final-price-start, price-end: final-price-end })
-          )
-          (begin
-            (try! (contract-call? .test-usdcx transfer-from SELF user user-amount none))
-            (ok { won: true, payout: user-amount, outcome: outcome, price-start: final-price-start, price-end: final-price-end })
-          )
-        )
-        (ok { won: false, payout: u0, outcome: outcome, price-start: final-price-start, price-end: final-price-end })
-      )
-    )
-  )
-)
-```
-
-#### 1.5 Atualizar funcoes read-only
-
-```clarity
-;; DE: get-bet recebe (round-id, user)
-;; PARA: get-bet recebe (round-id, user, side)
-(define-read-only (get-bet (round-id uint) (user principal) (side (string-ascii 4)))
-  (map-get? bets { round-id: round-id, user: user, side: side })
-)
-
-;; NOVA: retorna ambos os lados de uma vez
-(define-read-only (get-user-bets (round-id uint) (user principal))
-  {
-    up: (map-get? bets { round-id: round-id, user: user, side: "UP" }),
-    down: (map-get? bets { round-id: round-id, user: user, side: "DOWN" })
-  }
-)
-```
-
-#### 1.6 Remover `ERR_ALREADY_BET`
-A constante `ERR_ALREADY_BET` (u1008) nao e mais necessaria. Pode ser mantida para compatibilidade ou removida.
-
----
-
-### PASSO 2: Atualizar Frontend — `components/MarketCardV4.tsx`
-
-#### 2.1 Remover trava de aposta unica
-```typescript
-// REMOVER estado betPlacedRoundId (linha 62):
-// const [betPlacedRoundId, setBetPlacedRoundId] = useState<number | null>(null)
-
-// REMOVER calculo alreadyBet (linha 350):
-// const alreadyBet = betPlacedRoundId !== null && ...
-
-// MUDAR canTrade (linha 351):
-// DE:  const canTrade = isTradingOpen && stxAddress && !trading && !alreadyBet
-// PARA: const canTrade = isTradingOpen && stxAddress && !trading
-```
-
-#### 2.2 Adicionar tracking de apostas acumuladas no round atual
-Substituir `betPlacedRoundId` e `lastTrade` por um estado que acumula apostas:
-
-```typescript
-interface RoundBets {
-  roundId: number
-  up: number   // total USD apostado em UP neste round
-  down: number // total USD apostado em DOWN neste round
-}
-
-const [roundBets, setRoundBets] = useState<RoundBets | null>(null)
-```
-
-#### 2.3 Atualizar funcao `buy()`
-```typescript
-// Apos sucesso da tx, ACUMULAR ao inves de bloquear:
-const prevBets = (roundBets?.roundId === round.id) ? roundBets : { roundId: round.id, up: 0, down: 0 }
-setRoundBets({
-  roundId: round.id,
-  up: prevBets.up + (side === 'UP' ? v : 0),
-  down: prevBets.down + (side === 'DOWN' ? v : 0),
-})
-setLastTrade({ side, shares: v })
-setAmount('')
-```
-
-#### 2.4 Atualizar area de mensagens
-Onde mostra "Bet placed: $X on UP", mudar para mostrar total acumulado:
-```typescript
-// Se tem apostas no round atual, mostra resumo mas NAO desabilita botoes
-roundBets && roundBets.roundId === round?.id && (roundBets.up > 0 || roundBets.down > 0) ? (
-  <div className="...">
-    <span className="text-zinc-500">Your bets: </span>
-    {roundBets.up > 0 && <span className="text-up font-medium">${roundBets.up} UP</span>}
-    {roundBets.up > 0 && roundBets.down > 0 && <span className="text-zinc-600"> | </span>}
-    {roundBets.down > 0 && <span className="text-down font-medium">${roundBets.down} DOWN</span>}
-  </div>
-) : // ... resto
-```
-
-#### 2.5 Resetar ao mudar de round
-No useEffect que detecta mudanca de round (linha 78-84), resetar `roundBets`:
-```typescript
-if (lastRoundIdRef.current !== newRound.id) {
-  lastRoundIdRef.current = newRound.id
-  openPriceRef.current = currentPrice
-  setPriceHistory([{ time: 0, up: 50, down: 50 }])
-  setLastTrade(null)
-  setRoundBets(null)  // <-- resetar apostas acumuladas
-}
-```
-
----
-
-### PASSO 3: Atualizar `components/ClaimButton.tsx`
-
-#### 3.1 Mudar interface PendingRound para suportar 2 lados
-```typescript
-interface PendingBet {
-  side: 'UP' | 'DOWN'
-  amount: number
-  claimed: boolean
-}
-
-interface PendingRound {
-  roundId: number
-  bets: PendingBet[]  // pode ter 1 ou 2 entries (UP e/ou DOWN)
-}
-```
-
-#### 3.2 Atualizar `fetchPendingRounds`
-Para cada roundId, buscar AMBOS os lados:
-```typescript
-// Chama get-user-bets ao inves de get-bet
-functionName: 'get-user-bets',
-args: [cvToHex(uintCV(roundId)), cvToHex(standardPrincipalCV(stxAddress))]
-```
-Ou fazer 2 chamadas `get-bet` (uma para "UP", outra para "DOWN") e combinar.
-
-**Opção mais simples** (2 chamadas por round):
-```typescript
-for (const roundId of roundIds) {
-  const bets: PendingBet[] = []
-  for (const side of ['UP', 'DOWN']) {
-    const betResponse = await fetch('/api/stacks-read', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contractId: BITPREDIX_CONTRACT,
-        functionName: 'get-bet',
-        args: [
-          cvToHex(uintCV(roundId)),
-          cvToHex(standardPrincipalCV(stxAddress)),
-          cvToHex(stringAsciiCV(side))  // NOVO: side como 3o argumento
-        ],
-        sender: stxAddress
-      })
-    })
-    // Parse e adiciona a bets[] se existir
-  }
-  if (bets.length > 0) {
-    rounds.push({ roundId, bets })
-  }
-}
-```
-
-#### 3.3 Atualizar `handleClaim` — claim por side
-Para cada PendingRound, fazer claim de cada bet (lado) separadamente:
-```typescript
-for (const round of batch) {
-  for (const bet of round.bets) {
-    if (bet.claimed) continue
-
-    await openContractCall({
-      functionName: 'claim-round-side',  // MUDOU de claim-round
-      functionArgs: [
-        uintCV(round.roundId),
-        stringAsciiCV(bet.side),          // NOVO: side como parametro
-        uintCV(prices.priceStart),
-        uintCV(prices.priceEnd)
-      ],
-      // ...
-    })
-  }
-}
-```
-
----
-
-### PASSO 4: Atualizar `.env.local`
-
-```env
-NEXT_PUBLIC_BITPREDIX_CONTRACT_ID=ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.bitpredix-v6
-```
-
----
-
-### PASSO 5: Deploy e Teste
-
-1. Deploy `bitpredix-v6.clar` na testnet via Hiro Wallet ou CLI
-2. Atualizar `.env.local` com novo contract ID
-3. Testar cenarios:
-   - [ ] Apostar UP, depois apostar UP de novo (deve acumular)
-   - [ ] Apostar UP, depois apostar DOWN (deve permitir)
-   - [ ] Claim de round com aposta so UP
-   - [ ] Claim de round com aposta so DOWN
-   - [ ] Claim de round com apostas em ambos os lados
-   - [ ] Verificar payout correto com apostas acumuladas
-   - [ ] Verificar que pending-rounds remove corretamente apos claim de todos os lados
-
----
-
-## Resumo das Mudancas por Arquivo
-
-| Arquivo | Mudanca |
+### Components
+| Component | Purpose |
 |---|---|
-| `contracts/bitpredix-v6.clar` | **NOVO** - Copia de v5 com bets key `{round-id, user, side}`, acumulacao, claim-round-side |
-| `components/MarketCardV4.tsx` | Remove trava `alreadyBet`, adiciona tracking acumulado `roundBets`, atualiza UI |
-| `components/ClaimButton.tsx` | Busca ambos os lados, chama `claim-round-side` com parametro `side` |
-| `.env.local` | Atualiza `NEXT_PUBLIC_BITPREDIX_CONTRACT_ID` para v6 |
-| `lib/positions.ts` | Nenhuma mudanca necessaria (ja suporta multiplas trades por round) |
+| `MarketCardV4Wrapper.tsx` | Dynamic import (CSR only) |
+| `ConnectWalletButton.tsx` | Xverse wallet connection |
+| `MintTestTokens.tsx` | Onboarding: mint test tokens |
+| `BtcPriceChart.tsx` | lightweight-charts price chart |
+| `TradeTape.tsx` | Scrolling recent trades ticker |
+| `Countdown.tsx` | Round timer |
+| `ResolutionModal.tsx` | Win/loss result display |
+| `AppHeader.tsx` | Navigation bar |
 
-## Notas Importantes
-- **v5 permanece intacto** — criamos v6 como novo contrato
-- O **frontend detecta o contrato via `.env.local`** — basta mudar a variavel
-- A funcao `add-user-pending-round` ja tem `index-of?` que evita duplicatas na lista — quando o user aposta novamente no mesmo round, o round nao e adicionado 2x
-- O `lib/positions.ts` (localStorage) ja suporta multiplas trades por round naturalmente
-- O `stringAsciiCV` do `@stacks/transactions` e usado para passar "UP"/"DOWN" como argumento no claim
+### Scripts
+| Script | Purpose |
+|---|---|
+| `scripts/mint-test-tokens.js` | Mint tokens for testing |
+| `scripts/resolver-daemon.mjs` | Auto-settle rounds |
+| `scripts/oracle-daemon.mjs` | Oracle price daemon |
+| `scripts/cron-oracle.mjs` | Cron-based oracle |
+
+---
+
+## Key Architecture Patterns
+
+### 1. Cross-Device Sync (Polling + KV)
+SSE doesn't work on multi-instance Vercel serverless. Solution:
+- Clients poll `/api/round` every 1 second
+- On-chain state from Hiro API merged with optimistic KV state
+- Merge strategy: `max(on-chain, optimistic)` for pool totals
+- Trade dedup by ID prevents duplicates across polling + client broadcast
+
+### 2. Sponsored Transactions
+Users don't pay gas. Flow:
+1. Client builds unsigned tx with `sponsored: true, fee: 0`
+2. Wallet signs tx
+3. Client sends signed hex to `/api/sponsor`
+4. Server validates (contract + function allowlist), adds sponsorship, broadcasts
+5. **Nonce tracking**: Redis lock + KV nonce prevents `ConflictingNonceInMempool`
+
+### 3. Deterministic Settlement
+- **Open price**: `instrumentation.ts` captures on server startup, also first client POST wins
+- **Close price**: Pyth Benchmarks API (deterministic, same for all)
+- Contract stores prices on first claim (subsequent claims use stored values)
+
+### 4. LMSR AMM Pricing
+```
+b = B0 (3000) + volumeTraded
+priceUp = exp(qUp/b) / (exp(qUp/b) + exp(qDown/b))
+```
+Higher volume = lower price impact. Used for UI display only (contract uses simple pool ratio for payouts).
+
+---
+
+## Environment Variables (`.env.local`)
+```
+NEXT_PUBLIC_STACKS_NETWORK=testnet
+NEXT_PUBLIC_BITPREDIX_CONTRACT_ID=ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv1
+NEXT_PUBLIC_TEST_USDCX_CONTRACT_ID=ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx
+ORACLE_MNEMONIC=<deployer mnemonic for sponsoring>
+UPSTASH_REDIS_REST_URL=<upstash url>
+UPSTASH_REDIS_REST_TOKEN=<upstash token>
+```
+
+## Development
+```bash
+npm run dev      # Start dev server
+npm run build    # Production build
+npm run test     # Run tests (vitest)
+```
+
+## Deploy Gotchas
+- **Clarity contracts must be pure ASCII** — em-dashes, curly quotes cause broadcast errors
+- **Deploy script**: use `fetch` for broadcast (not `curl`)
+- **.env.local** values with spaces break `source .env.local` — pass directly as env vars
+- **Nonce conflicts**: Rapid sequential bets require KV-based nonce tracking + Redis lock
+
+## Tailwind Custom Colors
+```
+bitcoin: '#F7931A'    up: '#22C55E'    down: '#EF4444'
+```
+
+## Fonts
+- Sans: Outfit
+- Mono: JetBrains Mono

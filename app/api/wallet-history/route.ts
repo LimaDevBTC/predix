@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const HIRO_API = 'https://api.testnet.hiro.so'
+import { HIRO_API, hiroHeaders } from '@/lib/hiro'
 const DEPLOYER = 'ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK'
 const FETCH_TIMEOUT = 15000
 
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
 
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: hiroHeaders(),
       signal: controller.signal,
     })
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const HIRO_TESTNET = 'https://api.testnet.hiro.so'
+import { HIRO_API as HIRO_TESTNET, hiroHeaders } from '@/lib/hiro'
 const BITPREDIX_ID = process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID
 
 function parseContractId(id: string): [string, string] {
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: hiroHeaders(),
     body: JSON.stringify(keyHex),
   })
   const json = (await res.json()) as { data?: string; [k: string]: unknown }
