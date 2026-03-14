@@ -845,94 +845,148 @@ export function MarketCardV4() {
       </div>
 
       <div className="px-3 pt-3 pb-2 sm:p-6">
-        {/* Mensagens */}
-        <div className="h-16 mb-3 flex items-stretch">
-          <div className="w-full flex items-center">
-            {roundResult ? (
-              <div
-                className={`w-full h-full px-4 rounded-lg text-sm flex items-center justify-between gap-2 ${
-                  roundResult.won ? 'bg-up/10 border border-up/30' : 'bg-down/10 border border-down/30'
-                }`}
-                style={{ animation: 'fadeIn 0.3s ease-out' }}
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span className={`text-lg shrink-0 ${roundResult.won ? 'text-up' : 'text-down'}`}>
-                    {roundResult.won ? '\u2713' : '\u2717'}
-                  </span>
-                  <div className="flex flex-col">
-                    <span className={`font-bold text-sm ${roundResult.won ? 'text-up' : 'text-down'}`}>
-                      {roundResult.won ? 'You won!' : 'You lost'}
-                    </span>
-                    {roundResult.netPnL !== null && (
-                      <span className={`font-mono text-xs ${roundResult.won ? 'text-up/80' : 'text-down/80'}`}>
-                        {roundResult.netPnL >= 0 ? '+' : '-'}${Math.abs(roundResult.netPnL).toFixed(2)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setRoundResult(null)}
-                  className="px-2 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs shrink-0 transition"
-                >
-                  OK
-                </button>
-              </div>
-            ) : error ? (
-              <div className="w-full h-full px-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between gap-2">
-                <span className="flex-1">{error}</span>
-                <button
-                  onClick={() => setError(null)}
-                  className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-medium shrink-0"
-                >
-                  Dismiss
-                </button>
-              </div>
-            ) : trading ? (
-              <div className="w-full h-full px-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm flex items-center gap-3">
-                <div className="h-5 w-5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin shrink-0" />
-                <p className="font-medium">Awaiting wallet approval...</p>
-              </div>
-            ) : roundBets && roundBets.roundId === round?.id && (roundBets.up > 0 || roundBets.down > 0) ? (
-              <div className="w-full h-full px-4 rounded-lg bg-zinc-800/80 text-zinc-400 text-sm flex items-center gap-1">
-                <span className="text-zinc-500">Your predictions: </span>
-                {roundBets.up > 0 && <span className="text-up font-medium">${roundBets.up} UP</span>}
-                {roundBets.up > 0 && roundBets.down > 0 && <span className="text-zinc-600"> | </span>}
-                {roundBets.down > 0 && <span className="text-down font-medium">${roundBets.down} DOWN</span>}
-                {isEarlyBet && <span className="ml-1 text-[9px] text-yellow-400 font-medium uppercase">Jackpot</span>}
-              </div>
-            ) : isTradingOpen ? (
-              <div className="w-full h-full px-4 rounded-lg bg-zinc-800/60 text-zinc-400 text-sm border border-zinc-700/50 flex flex-col justify-center">
-                <p className="font-medium text-zinc-300 leading-tight">Market open</p>
-                <p className="text-xs text-zinc-500 mt-0.5 leading-tight">
-                  Set the amount and choose UP or DOWN to predict
-                </p>
-              </div>
-            ) : (
-              <div className="w-full h-full px-4 rounded-lg bg-zinc-800/60 text-amber-400/90 text-sm border border-zinc-700/50 flex items-center justify-center">
-                Predictions closed. Next round starting...
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Velocity Jackpot Banner */}
-        {jackpot && (
-          <div className="px-3 py-2 border-b border-zinc-800 bg-gradient-to-r from-yellow-500/5 to-amber-500/5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-xs text-yellow-500/80 uppercase tracking-wider font-medium">
-                Velocity Jackpot
-              </span>
-              <span className="font-mono text-xs sm:text-sm font-bold text-yellow-400">
-                ${jackpot.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {/* Status Bar — premium terminal-style notification system */}
+        {(() => {
+          /* ── Jackpot money-bag badge (reused across all states) ── */
+          const JackpotBadge = jackpot ? (
+            <div className={`shrink-0 relative ml-auto pl-2 w-10 h-10 flex items-center justify-center ${earlySecsLeft > 0 ? 'animate-jackpot-glow' : ''}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/moneybag.png" alt="" className="w-9 h-9 object-contain select-none pointer-events-none" draggable={false} />
+              {/* Value centered on the bag body */}
+              <span className="absolute top-1/2 left-1/2 -translate-x-[20%] translate-y-[35%] font-mono text-[9px] font-black text-zinc-900 leading-none whitespace-nowrap drop-shadow-[0_0_2px_rgba(251,191,36,0.6)]">
+                ${jackpot.balance >= 1000
+                  ? `${(jackpot.balance / 1000).toFixed(1)}k`
+                  : jackpot.balance.toFixed(0)}
               </span>
             </div>
-            {earlySecsLeft > 0 && (
-              <p className="text-[9px] sm:text-[10px] text-yellow-500/60 mt-0.5">
-                Bet now for jackpot eligibility — {earlySecsLeft}s left
-              </p>
-            )}
-          </div>
-        )}
+          ) : null
+
+          return (
+            <div className="mb-3 animate-status-in">
+              {/* Fixed-height container — never changes size across states */}
+              <div className="h-11 relative overflow-hidden rounded-lg flex items-center">
+                {roundResult ? (
+                  /* ── WIN / LOSS ── */
+                  <div
+                    className={`absolute inset-0 flex items-center gap-2 px-3 ${
+                      roundResult.won
+                        ? 'bg-up/[0.07] border border-up/20 rounded-lg'
+                        : 'bg-down/[0.07] border border-down/20 rounded-lg'
+                    }`}
+                  >
+                    <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${roundResult.won ? 'bg-up' : 'bg-down'}`} />
+                    <span className={`text-sm font-bold shrink-0 ${roundResult.won ? 'text-up' : 'text-down'}`}>
+                      {roundResult.won ? '✓' : '✗'}
+                    </span>
+                    <span className={`font-bold text-sm shrink-0 ${roundResult.won ? 'text-up' : 'text-down'}`}>
+                      {roundResult.won ? 'Won' : 'Lost'}
+                    </span>
+                    {roundResult.netPnL !== null && (
+                      <span className={`font-mono text-sm font-bold ${roundResult.won ? 'text-up' : 'text-down'}`}>
+                        {roundResult.netPnL >= 0 ? '+' : '−'}${Math.abs(roundResult.netPnL).toFixed(2)}
+                      </span>
+                    )}
+                    <div className="flex-1" />
+                    <button
+                      onClick={() => setRoundResult(null)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium shrink-0 transition-all active:scale-95 ${
+                        roundResult.won
+                          ? 'bg-up/20 text-up hover:bg-up/30'
+                          : 'bg-down/20 text-down hover:bg-down/30'
+                      }`}
+                    >
+                      OK
+                    </button>
+                    {JackpotBadge}
+                  </div>
+                ) : error ? (
+                  /* ── ERROR ── */
+                  <div className="absolute inset-0 flex items-center gap-2 px-3 bg-red-500/[0.07] border border-red-500/20 rounded-lg">
+                    <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-red-500" />
+                    <span className="text-red-400 text-sm shrink-0">!</span>
+                    <span className="flex-1 text-xs text-red-300 truncate">{error}</span>
+                    <button
+                      onClick={() => setError(null)}
+                      className="px-2.5 py-1 rounded-md bg-red-500/15 hover:bg-red-500/25 text-red-300 text-xs font-medium shrink-0 transition-all active:scale-95"
+                    >
+                      Dismiss
+                    </button>
+                    {JackpotBadge}
+                  </div>
+                ) : trading ? (
+                  /* ── AWAITING WALLET ── */
+                  <div className="absolute inset-0 flex items-center gap-2 px-3 bg-amber-500/[0.06] border border-amber-500/20 rounded-lg">
+                    <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-amber-400" />
+                    <div className="h-4 w-4 rounded-full border-2 border-amber-400/60 border-t-amber-400 animate-spin shrink-0" />
+                    <span className="text-sm text-amber-200 font-medium flex-1">Awaiting wallet...</span>
+                    {JackpotBadge}
+                  </div>
+                ) : roundBets && roundBets.roundId === round?.id && (roundBets.up > 0 || roundBets.down > 0) ? (
+                  /* ── ACTIVE BETS ── */
+                  <div className={`absolute inset-0 flex items-center gap-2 px-3 rounded-lg ${
+                    earlySecsLeft > 0
+                      ? 'bg-yellow-500/[0.04] border border-yellow-500/20'
+                      : 'bg-zinc-800/60 border border-zinc-700/40'
+                  }`}>
+                    <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${earlySecsLeft > 0 ? 'bg-yellow-500' : 'bg-bitcoin'}`} />
+                    {roundBets.up > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-up/10 text-up text-xs font-mono font-medium shrink-0">
+                        ▲ ${roundBets.up}
+                      </span>
+                    )}
+                    {roundBets.down > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-down/10 text-down text-xs font-mono font-medium shrink-0">
+                        ▼ ${roundBets.down}
+                      </span>
+                    )}
+                    {earlySecsLeft > 0 ? (
+                      <span className="text-[10px] text-yellow-400/80 font-medium truncate">
+                        Predict more for bigger Jackpot share — {earlySecsLeft}s
+                      </span>
+                    ) : isEarlyBet ? (
+                      <span className="px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 text-[9px] font-bold uppercase tracking-wider shrink-0">
+                        Jackpot
+                      </span>
+                    ) : null}
+                    <div className="flex-1" />
+                    {JackpotBadge}
+                  </div>
+                ) : isTradingOpen ? (
+                  /* ── MARKET OPEN ── */
+                  <div className={`absolute inset-0 flex items-center gap-2 px-3 rounded-lg ${
+                    earlySecsLeft > 0 && jackpot
+                      ? 'bg-yellow-500/[0.04] border border-yellow-500/20'
+                      : 'bg-zinc-800/40 border border-zinc-700/30'
+                  }`}>
+                    <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${
+                      earlySecsLeft > 0 && jackpot ? 'bg-yellow-500' : 'bg-up/60'
+                    }`} />
+                    <div className="relative flex items-center justify-center w-2 h-2 shrink-0">
+                      <span className={`absolute w-2 h-2 rounded-full animate-ping ${earlySecsLeft > 0 && jackpot ? 'bg-yellow-400/40' : 'bg-up/40'}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${earlySecsLeft > 0 && jackpot ? 'bg-yellow-400' : 'bg-up'}`} />
+                    </div>
+                    {earlySecsLeft > 0 && jackpot ? (
+                      <span className="text-sm text-yellow-200 font-bold flex-1 truncate">
+                        Predict now for Jackpot — {earlySecsLeft}s
+                      </span>
+                    ) : (
+                      <span className="text-sm text-zinc-300 font-medium flex-1">Market open</span>
+                    )}
+                    {JackpotBadge}
+                  </div>
+                ) : (
+                  /* ── TRADING CLOSED ── */
+                  <div className="absolute inset-0 flex items-center gap-2 px-3 bg-zinc-800/40 border border-zinc-700/30 rounded-lg">
+                    <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-amber-500/60" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    <span className="text-sm text-amber-400/90 flex-1">Next round starting...</span>
+                    {JackpotBadge}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* BTC Price Chart (full width, Polymarket style) */}
         <div className="relative mb-3 sm:mb-4 rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
