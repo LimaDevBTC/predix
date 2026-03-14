@@ -359,6 +359,76 @@ export async function getProjectedJackpot(): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// Rounds with bets (ZSET — cron reads this instead of scanning 120 on-chain)
+// ---------------------------------------------------------------------------
+
+/**
+ * Track that a round has bets. Called from sponsor endpoint on place-bet.
+ * Uses ZSET with score = roundId for easy range queries.
+ * TTL: 2 hours (rounds are resolved well before that).
+ */
+export async function trackRoundWithBets(roundId: number): Promise<void> {
+  const kv = getRedis()
+  if (!kv) return
+  try {
+    const pipe = kv.pipeline()
+    pipe.zadd('rounds-with-bets', { score: roundId, member: String(roundId) })
+    pipe.expire('rounds-with-bets', 7200) // 2 hours
+    await pipe.exec()
+  } catch (err) {
+    console.warn('[pool-store] trackRoundWithBets failed:', (err as Error).message)
+  }
+}
+
+/**
+ * Get all rounds that have bets (pending resolution/claims).
+ * Returns round IDs sorted ascending.
+ */
+export async function getRoundsWithBets(): Promise<number[]> {
+  const kv = getRedis()
+  if (!kv) return []
+  try {
+    const members: string[] = await kv.zrange('rounds-with-bets', 0, -1)
+    return members.map(Number).sort((a, b) => a - b)
+  } catch (err) {
+    console.warn('[pool-store] getRoundsWithBets failed:', (err as Error).message)
+    return []
+  }
+}
+
+/**
+ * Remove a round from tracking after it's fully resolved and all bets claimed.
+ */
+export async function removeResolvedRound(roundId: number): Promise<void> {
+  const kv = getRedis()
+  if (!kv) return
+  try {
+    await kv.zrem('rounds-with-bets', String(roundId))
+  } catch (err) {
+    console.warn('[pool-store] removeResolvedRound failed:', (err as Error).message)
+  }
+}
+
+/**
+ * Get active user count without writing a heartbeat (read-only, for cron).
+ */
+export async function getActiveUserCount(): Promise<number> {
+  const kv = getRedis()
+  if (!kv) return 0
+  try {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const pipe = kv.pipeline()
+    pipe.zremrangebyscore('active-users', '-inf', nowSec - 15)
+    pipe.zcard('active-users')
+    const results = await pipe.exec()
+    return (results[1] as number) ?? 0
+  } catch (err) {
+    console.warn('[pool-store] getActiveUserCount failed:', (err as Error).message)
+    return 0
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Active users (heartbeat via ZSET — score = unix timestamp)
 // ---------------------------------------------------------------------------
 

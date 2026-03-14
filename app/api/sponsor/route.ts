@@ -14,6 +14,7 @@ import {
   releaseSponsorLock,
   addOptimisticBet,
   addOptimisticEarlyBet,
+  trackRoundWithBets,
 } from '@/lib/pool-store'
 
 // Contratos permitidos para sponsorship (predixv2 + gateway + token)
@@ -282,6 +283,7 @@ export async function POST(req: NextRequest) {
               const amountMicro = Number(funcArgs[2]?.value ?? 0)
               if (roundId > 0 && (side === 'UP' || side === 'DOWN') && amountMicro > 0) {
                 await addOptimisticBet(roundId, side as 'UP' | 'DOWN', amountMicro, result.txid)
+                await trackRoundWithBets(roundId)
                 console.log(`[sponsor] KV optimistic: round=${roundId} ${side} $${(amountMicro / 1e6).toFixed(2)} txid=${result.txid}`)
 
                 // Track early bets for jackpot display (KV optimistic — real data is on-chain)

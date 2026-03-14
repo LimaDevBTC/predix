@@ -19,6 +19,9 @@ import {
   acquireSponsorLock,
   releaseSponsorLock,
   setProjectedJackpot,
+  getRoundsWithBets,
+  removeResolvedRound,
+  getActiveUserCount,
 } from '@/lib/pool-store'
 
 export const dynamic = 'force-dynamic'
@@ -548,33 +551,60 @@ export async function GET(req: Request) {
         logAndPrint({ action: 'nonce', detail: `API nonce (no KV): ${nonce}` })
       }
 
-      // Scan recent rounds — wide window to catch rounds stuck by Stacks block time lag
-      // Batched (5 at a time + 200ms delay) to avoid Hiro testnet rate limiting (429)
-      const SCAN_BACK = 120
-      const BATCH_SIZE = 5
-      const currentRoundId = Math.floor(Date.now() / 60000)
-      const roundIds = Array.from({ length: SCAN_BACK }, (_, i) => currentRoundId - SCAN_BACK + i)
+      // --- Optimized scan: KV-first + small on-chain safety net ---
+      // 1. KV rounds-with-bets: sponsor endpoint tracks every round that received a bet (0 Hiro calls)
+      // 2. On-chain scan: only last 5 rounds as safety net (5 Hiro calls instead of 120)
+      // 3. Active users check: if no users and no KV rounds, skip entirely
 
-      const activeIds: number[] = []
-      for (let b = 0; b < roundIds.length; b += BATCH_SIZE) {
-        const batch = roundIds.slice(b, b + BATCH_SIZE)
-        const results = await Promise.all(batch.map(id => readRound(id).then(r => ({ id, round: r })).catch(() => ({ id, round: null }))))
+      const kvRounds = await getRoundsWithBets()
+      const activeUsers = await getActiveUserCount()
+      const currentRoundId = Math.floor(Date.now() / 60000)
+
+      logAndPrint({ action: 'state', detail: `KV rounds=${kvRounds.length} [${kvRounds.join(',')}] activeUsers=${activeUsers}` })
+
+      // Small on-chain scan (last 5 min) as safety net — catches bets placed
+      // before the KV tracking was deployed, or if KV write failed
+      const SCAN_BACK = 5
+      const scanIds = Array.from({ length: SCAN_BACK }, (_, i) => currentRoundId - SCAN_BACK + i)
+      // Filter out IDs already in KV to avoid duplicate reads
+      const kvSet = new Set(kvRounds)
+      const onChainOnlyIds = scanIds.filter(id => !kvSet.has(id))
+
+      const scanActiveIds: number[] = []
+      if (onChainOnlyIds.length > 0) {
+        const results = await Promise.all(
+          onChainOnlyIds.map(id => readRound(id).then(r => ({ id, round: r })).catch(() => ({ id, round: null })))
+        )
         for (const r of results) {
           if (r.round && (r.round.totalUp + r.round.totalDown > 0)) {
-            activeIds.push(r.id)
+            scanActiveIds.push(r.id)
           }
         }
-        if (b + BATCH_SIZE < roundIds.length) await sleep(200)
       }
 
-      logAndPrint({ action: 'scan', detail: `${SCAN_BACK} rounds checked, ${activeIds.length} with bets: [${activeIds.join(',')}]` })
+      // Merge KV + on-chain scan, deduplicate, sort ascending
+      const allIds = [...new Set([...kvRounds, ...scanActiveIds])].sort((a, b) => a - b)
+
+      if (allIds.length === 0) {
+        logAndPrint({ action: 'skip', detail: `No rounds with bets (scanned ${onChainOnlyIds.length} on-chain)` })
+      } else {
+        logAndPrint({ action: 'scan', detail: `${allIds.length} rounds to process: [${allIds.join(',')}] (${onChainOnlyIds.length} on-chain checked)` })
+      }
 
       // Process only rounds that have bets (sequentially — needs nonce ordering)
-      for (const roundId of activeIds) {
+      for (const roundId of allIds) {
+        const prevNonce = nonce
         nonce = await processRound(roundId, nonce, privateKey, log)
+
+        // If nonce didn't change, round was fully processed — remove from KV tracking
+        // (processRound returns same nonce when round has no work left)
+        if (nonce === prevNonce && kvSet.has(roundId)) {
+          await removeResolvedRound(roundId)
+          logAndPrint({ action: 'kv-cleanup', detail: `Removed R${roundId} from rounds-with-bets` })
+        }
       }
 
-      logAndPrint({ action: 'done', detail: `Processed ${activeIds.length} active rounds` })
+      logAndPrint({ action: 'done', detail: `Processed ${allIds.length} rounds (${onChainOnlyIds.length} on-chain reads)` })
 
       // Persist final nonce to KV so sponsor endpoint picks it up
       await setSponsorNonce(BigInt(nonce))
