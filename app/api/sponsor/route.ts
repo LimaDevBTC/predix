@@ -227,7 +227,20 @@ export async function POST(req: NextRequest) {
       const usedSponsorNonce = auth.sponsorSpendingCondition?.nonce
       console.log(`[sponsor] Attempt ${attempt}: origin=${usedOriginNonce}, sponsor=${usedSponsorNonce}, self=${isSelfSponsored}`)
 
-      const result = await broadcastTransaction({ transaction: sponsoredTx, network: 'testnet' })
+      let result: Record<string, unknown>
+      try {
+        result = await broadcastTransaction({ transaction: sponsoredTx, network: 'testnet' }) as Record<string, unknown>
+      } catch (broadcastErr) {
+        // broadcastTransaction can throw "fail to parse node response" when the node
+        // returns non-JSON (e.g., HTML error page on 429/503). Retry with backoff.
+        const msg = broadcastErr instanceof Error ? broadcastErr.message : String(broadcastErr)
+        console.warn(`[sponsor] Broadcast exception attempt ${attempt}: ${msg}`)
+        if (attempt < MAX_RETRIES && msg.includes('parse')) {
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+          continue
+        }
+        throw broadcastErr
+      }
 
       // Check for broadcast errors
       if ('error' in result) {
@@ -282,7 +295,7 @@ export async function POST(req: NextRequest) {
               const side = String(funcArgs[1]?.value ?? '').toUpperCase()
               const amountMicro = Number(funcArgs[2]?.value ?? 0)
               if (roundId > 0 && (side === 'UP' || side === 'DOWN') && amountMicro > 0) {
-                await addOptimisticBet(roundId, side as 'UP' | 'DOWN', amountMicro, result.txid)
+                await addOptimisticBet(roundId, side as 'UP' | 'DOWN', amountMicro, result.txid as string)
                 await trackRoundWithBets(roundId)
                 console.log(`[sponsor] KV optimistic: round=${roundId} ${side} $${(amountMicro / 1e6).toFixed(2)} txid=${result.txid}`)
 
