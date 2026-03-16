@@ -900,7 +900,7 @@ export function MarketCardV4() {
                   : jackpot.balance.toFixed(0)}
               </span>
               {/* Tooltip — hover (desktop) or tap (mobile via .touched class) */}
-              <span className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-zinc-900 border border-yellow-500/30 text-yellow-400 text-[10px] font-mono font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 [.touched_&]:opacity-100 transition-opacity pointer-events-none shadow-lg">
+              <span className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-zinc-900 border border-yellow-500/30 text-yellow-400 text-[10px] font-mono font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 group-[.touched]:opacity-100 transition-opacity pointer-events-none shadow-lg">
                 ${jackpot.balance.toFixed(2)}
               </span>
             </div>
