@@ -73,6 +73,7 @@ interface RoundResult {
   outcome: 'UP' | 'DOWN'
   netPnL: number | null  // positive = won, negative = lost, null = pool data unavailable
   won: boolean
+  refund?: boolean  // true when no counterparty — bets returned, no win/loss
 }
 
 interface PoolData {
@@ -101,6 +102,7 @@ export function MarketCardV4() {
   const tradeTapeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const roundBetsRef = useRef(roundBets)
   const poolRef = useRef(pool)
+  const hasCounterpartyRef = useRef(hasCounterparty)
   const shownTradeIdsRef = useRef<Set<string>>(new Set())
 
   const roundId = round?.id ?? null
@@ -157,33 +159,46 @@ export function MarketCardV4() {
         const prevPool = poolRef.current
         // Only calculate result if bets belong to the round that just ended
         if (prevBets && prevBets.roundId === lastRoundIdRef.current && (prevBets.up > 0 || prevBets.down > 0) && prevOpenPrice && currentPrice) {
-          const outcome: 'UP' | 'DOWN' = currentPrice > prevOpenPrice ? 'UP' : 'DOWN'
-          const totalCost = prevBets.up + prevBets.down
-          const winningBet = outcome === 'UP' ? prevBets.up : prevBets.down
+          const prevHasCounterparty = hasCounterpartyRef.current
 
-          let netPnL: number | null = null
-          if (winningBet > 0 && prevPool && prevPool.totalUp > 0 && prevPool.totalDown > 0) {
-            const winningPool = outcome === 'UP' ? prevPool.totalUp : prevPool.totalDown
-            const totalPool = prevPool.totalUp + prevPool.totalDown
-            const grossPayout = (winningBet / winningPool) * totalPool
-            const netPayout = grossPayout * 0.97
-            netPnL = Math.round((netPayout - totalCost) * 100) / 100
-            // Safety clamp: PnL can never be worse than losing everything
-            netPnL = Math.max(-totalCost, netPnL)
-          } else if (winningBet > 0) {
-            // No reliable pool data — show conservative estimate
-            netPnL = Math.round((winningBet * 0.97 - totalCost) * 100) / 100
+          // No counterparty = round invalid, bets refunded
+          if (!prevHasCounterparty || !prevPool || prevPool.totalUp === 0 || prevPool.totalDown === 0) {
+            setRoundResult({
+              roundId: prevBets.roundId,
+              outcome: currentPrice > prevOpenPrice ? 'UP' : 'DOWN',
+              netPnL: null,
+              won: false,
+              refund: true,
+            })
           } else {
-            // User only bet on losing side — total loss
-            netPnL = -totalCost
-          }
+            const outcome: 'UP' | 'DOWN' = currentPrice > prevOpenPrice ? 'UP' : 'DOWN'
+            const totalCost = prevBets.up + prevBets.down
+            const winningBet = outcome === 'UP' ? prevBets.up : prevBets.down
 
-          setRoundResult({
-            roundId: prevBets.roundId,
-            outcome,
-            netPnL,
-            won: winningBet > 0,
-          })
+            let netPnL: number | null = null
+            if (winningBet > 0 && prevPool.totalUp > 0 && prevPool.totalDown > 0) {
+              const winningPool = outcome === 'UP' ? prevPool.totalUp : prevPool.totalDown
+              const totalPool = prevPool.totalUp + prevPool.totalDown
+              const grossPayout = (winningBet / winningPool) * totalPool
+              const netPayout = grossPayout * 0.97
+              netPnL = Math.round((netPayout - totalCost) * 100) / 100
+              // Safety clamp: PnL can never be worse than losing everything
+              netPnL = Math.max(-totalCost, netPnL)
+            } else if (winningBet > 0) {
+              // No reliable pool data — show conservative estimate
+              netPnL = Math.round((winningBet * 0.97 - totalCost) * 100) / 100
+            } else {
+              // User only bet on losing side — total loss
+              netPnL = -totalCost
+            }
+
+            setRoundResult({
+              roundId: prevBets.roundId,
+              outcome,
+              netPnL,
+              won: winningBet > 0,
+            })
+          }
         }
 
         lastRoundIdRef.current = newRound.id
@@ -306,11 +321,12 @@ export function MarketCardV4() {
   // Keep refs in sync for round transition capture
   useEffect(() => { roundBetsRef.current = roundBets }, [roundBets])
   useEffect(() => { poolRef.current = pool }, [pool])
+  useEffect(() => { hasCounterpartyRef.current = hasCounterparty }, [hasCounterparty])
 
-  // Auto-dismiss round result after 8s + confetti on win
+  // Auto-dismiss round result after 8s + confetti on win (not on refund)
   useEffect(() => {
     if (!roundResult) return
-    if (roundResult.won) {
+    if (roundResult.won && !roundResult.refund) {
       confetti({
         particleCount: 80,
         spread: 60,
@@ -884,7 +900,23 @@ export function MarketCardV4() {
             <div className="mb-3 animate-status-in">
               {/* Fixed-height container — never changes size across states */}
               <div className="h-11 relative overflow-hidden rounded-lg flex items-center">
-                {roundResult ? (
+                {roundResult?.refund ? (
+                  /* ── REFUND (no counterparty) ── */
+                  <div className="absolute inset-0 flex items-center gap-2 px-3 bg-orange-500/[0.07] border border-orange-500/20 rounded-lg">
+                    <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-orange-500" />
+                    <span className="text-sm shrink-0">↩</span>
+                    <span className="font-bold text-sm text-orange-400 shrink-0">Refunded</span>
+                    <span className="text-xs text-orange-300/80 truncate">No counterparty — bets returned</span>
+                    <div className="flex-1" />
+                    <button
+                      onClick={() => setRoundResult(null)}
+                      className="px-2.5 py-1 rounded-md text-xs font-medium shrink-0 transition-all active:scale-95 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30"
+                    >
+                      OK
+                    </button>
+                    {JackpotBadge}
+                  </div>
+                ) : roundResult ? (
                   /* ── WIN / LOSS ── */
                   <div
                     className={`absolute inset-0 flex items-center gap-2 px-3 ${

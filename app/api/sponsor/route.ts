@@ -120,7 +120,9 @@ export async function POST(req: NextRequest) {
     }
 
     // --- COUNTERPARTY VALIDATION for claim functions ---
-    // Block sponsored claims on rounds where a single wallet bet both sides (jackpot exploit)
+    // Block sponsored claims on rounds without valid counterparty (jackpot exploit prevention).
+    // A valid counterparty requires 2+ distinct wallets on opposite sides.
+    // Without this, a single user betting one side can drain the jackpot.
     if (functionName === 'claim-round-side' || functionName === 'claim-on-behalf') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const claimArgs = (payload as any).functionArgs
@@ -131,8 +133,8 @@ export async function POST(req: NextRequest) {
         const roundId = Number(claimArgs[roundIdArgIdx]?.value ?? 0)
         if (roundId > 0) {
           const validity = await getRoundBettorValidity(roundId)
-          if (!validity.hasCounterparty && validity.upBettors > 0 && validity.downBettors > 0) {
-            console.log(`[sponsor] REJECTED ${functionName}: round=${roundId} has no counterparty (${validity.uniqueWallets} unique wallet(s), both sides have bets)`)
+          if (!validity.hasCounterparty && (validity.upBettors > 0 || validity.downBettors > 0)) {
+            console.log(`[sponsor] REJECTED ${functionName}: round=${roundId} has no counterparty (up=${validity.upBettors}, down=${validity.downBettors}, unique=${validity.uniqueWallets})`)
             return NextResponse.json(
               { error: 'Round without counterparty — Jackpot locked', reason: 'no_counterparty' },
               { status: 403 }

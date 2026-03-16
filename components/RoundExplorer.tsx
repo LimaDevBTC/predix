@@ -115,6 +115,10 @@ interface GlobalStats {
   uniqueWallets: number
   largestPool: number
   avgPoolSize: number
+  totalJackpotDistributed: number
+  jackpotRounds: number
+  largestJackpot: number
+  avgJackpotSize: number
 }
 
 // ============================================================================
@@ -279,6 +283,34 @@ export function RoundExplorer({ initialRoundId }: { initialRoundId?: number }) {
           <GlobalStatCard label="Rounds Played" value={String(stats.totalRounds)} />
           <GlobalStatCard label="Unique Traders" value={String(stats.uniqueWallets)} />
           <GlobalStatCard label="UP Win Rate" value={`${stats.resolvedRounds > 0 ? ((stats.upWins / stats.resolvedRounds) * 100).toFixed(0) : 0}%`} />
+        </div>
+      )}
+
+      {/* Jackpot Stats */}
+      {stats && stats.totalJackpotDistributed > 0 && (
+        <div className="rounded-xl border border-bitcoin/20 bg-bitcoin/[0.03] p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <img src="/moneybag.png" alt="" className="w-4 h-4" />
+            <span className="text-sm font-medium text-bitcoin">Jackpot Distribution</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Total Distributed</div>
+              <div className="text-lg font-mono font-bold text-bitcoin mt-0.5">${formatCompact(stats.totalJackpotDistributed)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Jackpot Rounds</div>
+              <div className="text-lg font-mono font-bold text-zinc-200 mt-0.5">{stats.jackpotRounds}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Largest Jackpot</div>
+              <div className="text-lg font-mono font-bold text-zinc-200 mt-0.5">${formatUsd(stats.largestJackpot)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Avg Jackpot</div>
+              <div className="text-lg font-mono font-bold text-zinc-200 mt-0.5">${formatUsd(stats.avgJackpotSize)}</div>
+            </div>
+          </div>
         </div>
       )}
 

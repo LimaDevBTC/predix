@@ -52,6 +52,8 @@ interface ProfileStats {
   longestLoseStreak: number
   currentStreak: { type: 'win' | 'loss'; count: number }
   sideDistribution: { upVolume: number; downVolume: number }
+  totalJackpotEarned: number
+  jackpotWins: number
 }
 
 interface WalletProfile {
@@ -577,6 +579,36 @@ export default function ProfilePage({ address }: { address: string }) {
                   <span className="text-down text-xs font-medium w-16 sm:w-20">
                     {((stats.sideDistribution.downVolume / stats.totalVolumeUsd) * 100).toFixed(0)}% DOWN
                   </span>
+                </div>
+              </div>
+            )}
+
+            {/* Jackpot Earnings */}
+            {stats.totalJackpotEarned > 0 && (
+              <div className="rounded-xl border border-bitcoin/20 bg-bitcoin/[0.03] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <img src="/moneybag.png" alt="" className="w-4 h-4" />
+                  <span className="text-sm font-medium text-bitcoin">Jackpot Earnings</span>
+                </div>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Total Earned</div>
+                    <div className="text-xl font-mono font-bold text-bitcoin mt-0.5">
+                      +${formatUsd(stats.totalJackpotEarned)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Jackpot Wins</div>
+                    <div className="text-xl font-mono font-bold text-zinc-200 mt-0.5">
+                      {stats.jackpotWins}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Avg Bonus</div>
+                    <div className="text-xl font-mono font-bold text-zinc-200 mt-0.5">
+                      ${formatUsd(stats.totalJackpotEarned / stats.jackpotWins)}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

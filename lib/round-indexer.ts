@@ -102,6 +102,8 @@ export interface WalletProfile {
     longestLoseStreak: number
     currentStreak: { type: 'win' | 'loss'; count: number }
     sideDistribution: { upVolume: number; downVolume: number }
+    totalJackpotEarned: number
+    jackpotWins: number
   }
   equityCurve: EquityPoint[]
   recentBets: ProfileBetRecord[]
@@ -162,6 +164,8 @@ function getContractAddress(): string {
 function getGatewayAddress(): string | null {
   return process.env.NEXT_PUBLIC_GATEWAY_CONTRACT_ID || null
 }
+
+
 
 // ============================================================================
 // REDIS CLIENT (lazy singleton)
@@ -909,6 +913,7 @@ export async function getWalletProfile(
   let bestWin = 0, worstLoss = 0
   let upVolume = 0, downVolume = 0
   let totalVolume = 0
+  let totalJackpotEarned = 0, jackpotWins = 0
   let curStreak = 0, curStreakType: 'win' | 'loss' = 'win'
   let longestWin = 0, longestLose = 0
 
@@ -928,6 +933,11 @@ export async function getWalletProfile(
     totalPnl += bet.pnl
     cumPnl += bet.pnl
     equityCurve.push({ time: bet.timestamp, value: cumPnl })
+
+    if (bet.jackpotBonus > 0) {
+      totalJackpotEarned += bet.jackpotBonus
+      jackpotWins++
+    }
 
     if (bet.pnl > bestWin) bestWin = bet.pnl
     if (bet.pnl < worstLoss) worstLoss = bet.pnl
@@ -972,6 +982,8 @@ export async function getWalletProfile(
       longestLoseStreak: longestLose,
       currentStreak: { type: curStreakType, count: curStreak },
       sideDistribution: { upVolume, downVolume },
+      totalJackpotEarned,
+      jackpotWins,
     },
     equityCurve,
     recentBets,
@@ -1096,6 +1108,10 @@ export interface GlobalStats {
   uniqueWallets: number
   largestPool: number
   avgPoolSize: number
+  totalJackpotDistributed: number
+  jackpotRounds: number
+  largestJackpot: number
+  avgJackpotSize: number
 }
 
 export async function getGlobalStats(): Promise<GlobalStats> {
@@ -1107,6 +1123,9 @@ export async function getGlobalStats(): Promise<GlobalStats> {
   let downWins = 0
   const uniqueWallets = new Set<string>()
   let largestPool = 0
+  let totalJackpotDistributed = 0
+  let jackpotRounds = 0
+  let largestJackpot = 0
 
   for (const round of roundsIndex.values()) {
     if (round.totalPoolUsd === 0) continue
@@ -1121,6 +1140,13 @@ export async function getGlobalStats(): Promise<GlobalStats> {
     for (const bet of round.bets) {
       if (bet.status === 'success') uniqueWallets.add(bet.user)
     }
+    // Jackpot aggregation
+    if (round.jackpot && round.jackpot.locked && round.jackpot.snapshot > 0) {
+      const jpUsd = round.jackpot.snapshot / 1e6
+      totalJackpotDistributed += jpUsd
+      jackpotRounds++
+      if (jpUsd > largestJackpot) largestJackpot = jpUsd
+    }
   }
 
   return {
@@ -1132,6 +1158,10 @@ export async function getGlobalStats(): Promise<GlobalStats> {
     uniqueWallets: uniqueWallets.size,
     largestPool,
     avgPoolSize: totalRounds > 0 ? totalVolume / totalRounds : 0,
+    totalJackpotDistributed,
+    jackpotRounds,
+    largestJackpot,
+    avgJackpotSize: jackpotRounds > 0 ? totalJackpotDistributed / jackpotRounds : 0,
   }
 }
 
