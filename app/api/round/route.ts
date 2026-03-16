@@ -11,8 +11,6 @@ const ROUND_DURATION_MS = 60 * 1000
 import { HIRO_API as HIRO_TESTNET, hiroHeaders, disableApiKey } from '@/lib/hiro'
 const BITPREDIX_ID = process.env.NEXT_PUBLIC_BITPREDIX_CONTRACT_ID
 
-// Virtual seed liquidity for display pricing (must match frontend constant)
-const VIRTUAL_SEED = 100 * 1e6 // $100 in micro-units (6 decimals)
 
 // ---------------------------------------------------------------------------
 // Hiro on-chain cache — on-chain data changes only on tx confirmation (~30s),
@@ -243,9 +241,8 @@ export async function GET(request: NextRequest) {
           volumeTraded: (totalUp + totalDown) / 1e6,
         } as { qUp: number; qDown: number; volumeTraded: number },
       }
-      const effUp = VIRTUAL_SEED + totalUp
-      const effDown = VIRTUAL_SEED + totalDown
-      const pu = effUp / (effUp + effDown)
+      const total = totalUp + totalDown
+      const pu = total > 0 ? totalUp / total : 0.5
       const pd = 1 - pu
       return noCacheJson({
         round: roundToJson(round),

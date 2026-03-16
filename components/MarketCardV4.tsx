@@ -57,6 +57,8 @@ interface RoundResult {
   roundId: number
   outcome: 'UP' | 'DOWN'
   netPnL: number | null  // positive = won, negative = lost, null = pool data unavailable
+  poolPnL: number | null  // PnL from pool only (excluding jackpot)
+  jackpotPnL: number | null  // PnL from jackpot bonus
   won: boolean
   refund?: boolean  // true when no counterparty — bets returned, no win/loss
 }
@@ -85,6 +87,7 @@ export function MarketCardV4() {
   const tradeTapeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const roundBetsRef = useRef(roundBets)
   const poolRef = useRef(pool)
+  const jackpotRef = useRef(jackpot)
   const hasCounterpartyRef = useRef(hasCounterparty)
   const shownTradeIdsRef = useRef<Set<string>>(new Set())
 
@@ -150,6 +153,8 @@ export function MarketCardV4() {
               roundId: prevBets.roundId,
               outcome: currentPrice > prevOpenPrice ? 'UP' : 'DOWN',
               netPnL: null,
+              poolPnL: null,
+              jackpotPnL: null,
               won: false,
               refund: true,
             })
@@ -158,27 +163,41 @@ export function MarketCardV4() {
             const totalCost = prevBets.up + prevBets.down
             const winningBet = outcome === 'UP' ? prevBets.up : prevBets.down
 
-            let netPnL: number | null = null
+            let poolPnL: number | null = null
+            let jackpotPnL: number | null = null
             if (winningBet > 0 && prevPool.totalUp > 0 && prevPool.totalDown > 0) {
               const winningPool = outcome === 'UP' ? prevPool.totalUp : prevPool.totalDown
               const totalPool = prevPool.totalUp + prevPool.totalDown
               const grossPayout = (winningBet / winningPool) * totalPool
               const netPayout = grossPayout * 0.97
-              netPnL = Math.round((netPayout - totalCost) * 100) / 100
-              // Safety clamp: PnL can never be worse than losing everything
-              netPnL = Math.max(-totalCost, netPnL)
+              poolPnL = Math.round((netPayout - totalCost) * 100) / 100
+              poolPnL = Math.max(-totalCost, poolPnL)
+
+              // Jackpot bonus: (user_early_amount / winning_early_pool) * jackpot_snapshot
+              const prevJackpot = jackpotRef.current
+              if (prevJackpot && prevJackpot.balance > 0) {
+                const userEarly = outcome === 'UP' ? prevBets.earlyUp : prevBets.earlyDown
+                const winningEarlyPool = outcome === 'UP' ? prevJackpot.earlyUp : prevJackpot.earlyDown
+                if (userEarly > 0 && winningEarlyPool > 0) {
+                  jackpotPnL = Math.round((userEarly / winningEarlyPool) * prevJackpot.balance * 100) / 100
+                }
+              }
             } else if (winningBet > 0) {
-              // No reliable pool data — show conservative estimate
-              netPnL = Math.round((winningBet * 0.97 - totalCost) * 100) / 100
+              poolPnL = Math.round((winningBet * 0.97 - totalCost) * 100) / 100
             } else {
-              // User only bet on losing side — total loss
-              netPnL = -totalCost
+              poolPnL = -totalCost
             }
+
+            const netPnL = poolPnL !== null
+              ? Math.round(((poolPnL + (jackpotPnL ?? 0)) * 100)) / 100
+              : null
 
             setRoundResult({
               roundId: prevBets.roundId,
               outcome,
               netPnL,
+              poolPnL,
+              jackpotPnL,
               won: winningBet > 0,
             })
           }
@@ -304,6 +323,7 @@ export function MarketCardV4() {
   // Keep refs in sync for round transition capture
   useEffect(() => { roundBetsRef.current = roundBets }, [roundBets])
   useEffect(() => { poolRef.current = pool }, [pool])
+  useEffect(() => { jackpotRef.current = jackpot }, [jackpot])
   useEffect(() => { hasCounterpartyRef.current = hasCounterparty }, [hasCounterparty])
 
   // Auto-dismiss round result after 8s + confetti on win (not on refund)
@@ -867,7 +887,10 @@ export function MarketCardV4() {
         {(() => {
           /* ── Jackpot money-bag badge (reused across all states) ── */
           const JackpotBadge = jackpot ? (
-            <div className={`shrink-0 relative ml-auto pl-2 w-10 h-10 flex items-center justify-center ${earlySecsLeft > 0 ? 'animate-jackpot-glow' : ''}`}>
+            <div
+              className={`shrink-0 relative ml-auto pl-2 w-10 h-10 flex items-center justify-center group cursor-pointer ${earlySecsLeft > 0 ? 'animate-jackpot-glow' : ''}`}
+              onClick={(e) => { e.currentTarget.classList.toggle('touched') }}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/moneybag.png" alt="" className="w-9 h-9 object-contain select-none pointer-events-none" draggable={false} />
               {/* Value centered on the bag body */}
@@ -875,6 +898,10 @@ export function MarketCardV4() {
                 ${jackpot.balance >= 1000
                   ? `${(jackpot.balance / 1000).toFixed(1)}k`
                   : jackpot.balance.toFixed(0)}
+              </span>
+              {/* Tooltip — hover (desktop) or tap (mobile via .touched class) */}
+              <span className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-zinc-900 border border-yellow-500/30 text-yellow-400 text-[10px] font-mono font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 [.touched_&]:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                ${jackpot.balance.toFixed(2)}
               </span>
             </div>
           ) : null
@@ -915,9 +942,14 @@ export function MarketCardV4() {
                     <span className={`font-bold text-sm shrink-0 ${roundResult.won ? 'text-up' : 'text-down'}`}>
                       {roundResult.won ? 'Won' : 'Lost'}
                     </span>
-                    {roundResult.netPnL !== null && (
+                    {roundResult.poolPnL !== null && (
                       <span className={`font-mono text-sm font-bold ${roundResult.won ? 'text-up' : 'text-down'}`}>
-                        {roundResult.netPnL >= 0 ? '+' : '−'}${Math.abs(roundResult.netPnL).toFixed(2)}
+                        {roundResult.poolPnL >= 0 ? '+' : '−'}${Math.abs(roundResult.poolPnL).toFixed(2)}
+                      </span>
+                    )}
+                    {roundResult.jackpotPnL != null && roundResult.jackpotPnL > 0 && (
+                      <span className="font-mono text-sm font-bold text-yellow-400">
+                        +${roundResult.jackpotPnL.toFixed(2)} 🎰
                       </span>
                     )}
                     <div className="flex-1" />
