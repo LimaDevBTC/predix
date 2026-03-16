@@ -83,6 +83,7 @@ export function MarketCardV4() {
   const [hasCounterparty, setHasCounterparty] = useState(true)
   const [recentRounds, setRecentRounds] = useState<{ id: string; outcome: 'UP' | 'DOWN' }[]>([])
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
+  const [showJackpotTip, setShowJackpotTip] = useState(false)
   const [tradeTape, setTradeTape] = useState<TradeTapeItem[]>([])
   const tradeTapeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const roundBetsRef = useRef(roundBets)
@@ -888,8 +889,10 @@ export function MarketCardV4() {
           /* ── Jackpot money-bag badge (reused across all states) ── */
           const JackpotBadge = jackpot ? (
             <div
-              className={`shrink-0 relative ml-auto pl-2 w-10 h-10 flex items-center justify-center group cursor-pointer ${earlySecsLeft > 0 ? 'animate-jackpot-glow' : ''}`}
-              onClick={(e) => { e.currentTarget.classList.toggle('touched') }}
+              className={`shrink-0 relative ml-auto pl-2 w-10 h-10 flex items-center justify-center cursor-pointer ${earlySecsLeft > 0 ? 'animate-jackpot-glow' : ''}`}
+              onMouseEnter={() => setShowJackpotTip(true)}
+              onMouseLeave={() => setShowJackpotTip(false)}
+              onClick={() => setShowJackpotTip(p => !p)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/moneybag.png" alt="" className="w-9 h-9 object-contain select-none pointer-events-none" draggable={false} />
@@ -899,12 +902,16 @@ export function MarketCardV4() {
                   ? `${(jackpot.balance / 1000).toFixed(1)}k`
                   : jackpot.balance.toFixed(0)}
               </span>
-              {/* Tooltip — hover (desktop) or tap (mobile via .touched class) */}
-              <span className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-zinc-900 border border-yellow-500/30 text-yellow-400 text-[10px] font-mono font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 group-[.touched]:opacity-100 transition-opacity pointer-events-none shadow-lg">
-                ${jackpot.balance.toFixed(2)}
-              </span>
+              {/* Tooltip — positioned to the left of the bag */}
+              {showJackpotTip && (
+                <span className="absolute right-full top-1/2 -translate-y-1/2 mr-1 px-2 py-0.5 rounded bg-zinc-900 border border-yellow-500/30 text-yellow-400 text-[10px] font-mono font-bold whitespace-nowrap pointer-events-none shadow-lg z-10">
+                  ${jackpot.balance.toFixed(2)}
+                </span>
+              )}
             </div>
           ) : null
+
+          /* Jackpot tooltip — rendered outside overflow-hidden container */
 
           return (
             <div className="mb-3 animate-status-in">
