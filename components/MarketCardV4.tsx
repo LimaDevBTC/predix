@@ -1175,8 +1175,10 @@ export function MarketCardV4() {
                   </div>
 
                   {(() => {
-                    const upPct = (pool?.priceUp ?? 0.5) * 100
-                    const realTotal = (pool?.totalUp ?? 0) + (pool?.totalDown ?? 0)
+                    const realUp = pool?.totalUp ?? 0
+                    const realDown = pool?.totalDown ?? 0
+                    const realTotal = realUp + realDown
+                    const upPct = realTotal > 0 ? (realUp / realTotal) * 100 : 50
                     return (
                       <div className="space-y-1">
                         <div className="h-1.5 rounded-full overflow-hidden flex bg-zinc-800">
