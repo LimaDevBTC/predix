@@ -27,6 +27,8 @@ interface ProfileBetRecord {
   priceStart: number | null
   priceEnd: number | null
   txId: string
+  early: boolean
+  jackpotBonus: number
 }
 
 interface EquityPoint {
@@ -215,6 +217,7 @@ function BetRow({ bet, expanded, onToggle }: {
           <div className="flex items-center gap-2">
             <span className={`text-xs font-medium ${bet.side === 'UP' ? 'text-up' : 'text-down'}`}>
               {bet.side} {bet.side === 'UP' ? '\u2191' : '\u2193'}
+              {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Jackpot eligible">J</span>}
             </span>
             <span className="text-zinc-300 font-mono text-xs">${formatUsd(bet.amountUsd)}</span>
           </div>
@@ -250,6 +253,7 @@ function BetRow({ bet, expanded, onToggle }: {
           bet.side === 'UP' ? 'text-up' : 'text-down'
         }`}>
           {bet.side} {bet.side === 'UP' ? '\u2191' : '\u2193'}
+          {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Jackpot eligible">J</span>}
         </span>
 
         {/* Amount */}
@@ -302,6 +306,9 @@ function BetRow({ bet, expanded, onToggle }: {
             </span>
           )}
           <span>Pool: <span className="text-zinc-300">${formatUsd(bet.totalPool)}</span></span>
+          {bet.jackpotBonus > 0 && (
+            <span className="text-bitcoin">Jackpot: +${formatUsd(bet.jackpotBonus)}</span>
+          )}
           <a
             href={`https://explorer.hiro.so/txid/${bet.txId}?chain=testnet`}
             target="_blank"

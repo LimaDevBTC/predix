@@ -484,29 +484,67 @@ function RoundRow({
           </div>
 
           {/* Jackpot data */}
-          {round.jackpot && round.jackpot.locked && (
-            <div className="mt-2 p-2.5 rounded-lg bg-bitcoin/5 border border-bitcoin/20">
-              <div className="text-[10px] text-bitcoin/70 font-medium uppercase tracking-wider mb-1.5">Velocity Jackpot</div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Snapshot:</span>
-                  <span className="text-zinc-300">${formatUsd(round.jackpot.snapshot / 1e6)}</span>
+          {round.jackpot && round.jackpot.locked && (() => {
+            const jp = round.jackpot!
+            const earlyWinners = round.bets.filter(b => b.early && b.status === 'success' && b.side === round.outcome)
+            const earlyLosers = round.bets.filter(b => b.early && b.status === 'success' && b.side !== round.outcome)
+            const totalEarly = earlyWinners.length + earlyLosers.length
+            const winningSidePool = round.outcome === 'UP' ? jp.earlyUp : jp.earlyDown
+            const jackpotPctOfPool = round.totalPoolUsd > 0 ? (jp.snapshot / 1e6) / round.totalPoolUsd * 100 : 0
+
+            return (
+              <div className="mt-2 p-2.5 rounded-lg bg-bitcoin/5 border border-bitcoin/20">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <img src="/moneybag.png" alt="" className="w-3.5 h-3.5" />
+                    <span className="text-[10px] text-bitcoin/70 font-medium uppercase tracking-wider">Jackpot</span>
+                  </div>
+                  <span className="text-[10px] text-bitcoin/50">{jackpotPctOfPool.toFixed(1)}% of pool</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Distributed:</span>
-                  <span className="text-zinc-300">${formatUsd(round.jackpot.distributed / 1e6)}</span>
+
+                {/* Main jackpot amount */}
+                <div className="text-center mb-2">
+                  <span className="text-lg font-bold text-bitcoin">${formatUsd(jp.snapshot / 1e6)}</span>
+                  {jp.distributed > 0 && jp.distributed !== jp.snapshot && (
+                    <span className="text-[10px] text-zinc-500 ml-1.5">({formatUsd(jp.distributed / 1e6)} paid)</span>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Early UP:</span>
-                  <span className="text-up">${formatUsd(round.jackpot.earlyUp / 1e6)}</span>
+
+                {/* Early bets breakdown */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Early UP:</span>
+                    <span className={`font-medium ${round.outcome === 'UP' ? 'text-up' : 'text-zinc-400'}`}>
+                      ${formatUsd(jp.earlyUp / 1e6)}
+                      {round.outcome === 'UP' && <span className="text-[9px] ml-0.5 text-up/60">&#10003;</span>}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-500">Early DOWN:</span>
+                    <span className={`font-medium ${round.outcome === 'DOWN' ? 'text-down' : 'text-zinc-400'}`}>
+                      ${formatUsd(jp.earlyDown / 1e6)}
+                      {round.outcome === 'DOWN' && <span className="text-[9px] ml-0.5 text-down/60">&#10003;</span>}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Early DOWN:</span>
-                  <span className="text-down">${formatUsd(round.jackpot.earlyDown / 1e6)}</span>
+
+                {/* Winners summary */}
+                <div className="mt-2 pt-2 border-t border-bitcoin/10 flex items-center justify-between text-[10px]">
+                  <span className="text-zinc-500">
+                    {totalEarly} early predictor{totalEarly !== 1 ? 's' : ''}
+                    {earlyWinners.length > 0 && (
+                      <span className="text-up ml-1">({earlyWinners.length} won)</span>
+                    )}
+                  </span>
+                  {earlyWinners.length > 0 && winningSidePool > 0 && (
+                    <span className="text-bitcoin/70">
+                      avg bonus: ${formatUsd((jp.snapshot / 1e6) / earlyWinners.length)}
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Participants table */}
           {round.bets.length > 0 && (
@@ -516,10 +554,11 @@ function RoundRow({
               </div>
               <div className="rounded-lg border border-zinc-800 overflow-hidden">
                 {/* Table header */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1.5 bg-zinc-800/50 text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
+                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-3 py-1.5 bg-zinc-800/50 text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
                   <span>Wallet</span>
                   <span className="text-right">Side</span>
                   <span className="text-right">Amount</span>
+                  <span className="text-right">Jackpot</span>
                   <span className="text-right">Result</span>
                 </div>
                 {/* Rows */}
@@ -534,10 +573,19 @@ function RoundRow({
                     const won = !isPending && round.resolved && bet.side === round.outcome
                     const lost = !isPending && round.resolved && bet.side !== round.outcome
 
+                    // Calculate individual jackpot bonus
+                    let jpBonus = 0
+                    if (bet.early && won && round.jackpot && round.jackpot.locked) {
+                      const earlyWinPool = round.outcome === 'UP' ? round.jackpot.earlyUp : round.jackpot.earlyDown
+                      if (earlyWinPool > 0) {
+                        jpBonus = (bet.amount / earlyWinPool) * round.jackpot.snapshot / 1e6
+                      }
+                    }
+
                     return (
                       <div
                         key={bet.txId}
-                        className={`grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 border-t border-zinc-800/50 text-xs hover:bg-zinc-800/20 transition-colors ${isPending ? 'opacity-60' : ''}`}
+                        className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-3 py-2 border-t border-zinc-800/50 text-xs hover:bg-zinc-800/20 transition-colors ${isPending ? 'opacity-60' : ''}`}
                       >
                         {/* Wallet */}
                         <a
@@ -553,12 +601,17 @@ function RoundRow({
                           bet.side === 'UP' ? 'text-up' : 'text-down'
                         }`}>
                           {bet.side}
-                          {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Early bet (jackpot eligible)">V</span>}
+                          {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Early bet (jackpot eligible)">J</span>}
                         </span>
 
                         {/* Amount */}
                         <span className="text-right text-zinc-300">
                           ${formatUsd(bet.amountUsd)}
+                        </span>
+
+                        {/* Jackpot bonus */}
+                        <span className={`text-right ${jpBonus > 0 ? 'text-bitcoin font-medium' : 'text-zinc-600'}`}>
+                          {jpBonus > 0 ? `+$${formatUsd(jpBonus)}` : bet.early ? '-' : ''}
                         </span>
 
                         {/* Result */}

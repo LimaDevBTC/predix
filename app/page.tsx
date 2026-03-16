@@ -18,7 +18,7 @@ export default function Home() {
 
           <h4 className="font-semibold text-yellow-400 mt-4 mb-2 flex items-center gap-1.5">
             <img src="/moneybag.png" alt="" className="w-4 h-4" />
-            Velocity Jackpot
+            Jackpot
           </h4>
           <ul className="space-y-1.5">
             <li>• <strong className="text-zinc-300">1% of each round&apos;s volume</strong> goes into the Jackpot pool.</li>

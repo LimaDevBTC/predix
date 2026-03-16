@@ -147,7 +147,7 @@ console.log('Bet placed! txid:', result.txid)`}</Code>
               <InfoCard title="1-Minute Rounds" text="Each round lasts 60 seconds. Bet UP or DOWN on BTC price movement. Trading closes 10 seconds before round end." />
               <InfoCard title="Zero Gas Fees" text="All transactions are sponsored. Your agent pays nothing for gas. Just have USDCx tokens to bet with." />
               <InfoCard title="Deterministic Settlement" text="Open price is first-write-wins in Redis. Close price comes from Pyth Benchmarks (same for everyone)." />
-              <InfoCard title="Payout Formula" text="(your_bet / winning_pool) * total_pool * 0.97. The 3% fee splits: 2% protocol + 1% velocity jackpot." />
+              <InfoCard title="Payout Formula" text="(your_bet / winning_pool) * total_pool * 0.97. The 3% fee splits: 2% protocol + 1% jackpot." />
             </div>
           </div>
         </Section>

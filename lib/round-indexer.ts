@@ -74,6 +74,8 @@ export interface ProfileBetRecord {
   priceStart: number | null
   priceEnd: number | null
   txId: string
+  early: boolean
+  jackpotBonus: number   // jackpot bonus received (USD), 0 if not eligible
 }
 
 export interface EquityPoint {
@@ -872,6 +874,15 @@ export async function getWalletProfile(
         }
       }
 
+      // Calculate jackpot bonus for early winning bets
+      let jackpotBonus = 0
+      if (bet.early && round.resolved && round.outcome && bet.side === round.outcome && round.jackpot && round.jackpot.locked) {
+        const earlyWinPool = round.outcome === 'UP' ? round.jackpot.earlyUp : round.jackpot.earlyDown
+        if (earlyWinPool > 0) {
+          jackpotBonus = (bet.amount / earlyWinPool) * round.jackpot.snapshot / 1e6
+        }
+      }
+
       allBetRecords.push({
         roundId: round.roundId,
         timestamp: round.endTimestamp,
@@ -881,11 +892,13 @@ export async function getWalletProfile(
         resolved: round.resolved,
         totalPool: round.totalPoolUsd,
         winningPool,
-        pnl,
+        pnl: pnl + jackpotBonus,
         poolSharePct,
         priceStart: round.priceStart,
         priceEnd: round.priceEnd,
         txId: bet.txId,
+        early: bet.early,
+        jackpotBonus,
       })
     }
   }
