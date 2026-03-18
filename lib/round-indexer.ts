@@ -469,7 +469,7 @@ async function enrichUnresolvedRounds(): Promise<void> {
 
 /**
  * Compute jackpot data off-chain from early bets in each resolved round.
- * predixv7 doesn't have a round-jackpot map — jackpot is 1% of total pool
+ * predixv8 doesn't have a round-jackpot map — jackpot is 1% of total pool
  * volume, and early bet pools are computed from bet timestamps.
  */
 function computeJackpotData(): void {

@@ -7,13 +7,13 @@
  *   1. ASCII scan both contracts
  *   2. Deploy predixv3 (wait for confirmation)
  *   3. Deploy gatewayv2 (wait for confirmation)
- *   4. Call predixv7.set-initial-price(btc-price)   -- bootstrap price bounds
- *   5. Call predixv7.set-fee-recipient(deployer)     -- deployer = fee recipient
- *   6. Call gatewayv6.set-sponsor(deployer)          -- deployer = sponsor
- *   7. Call predixv7.seed-jackpot(200000000)         -- $200 USDCx jackpot seed
+ *   4. Call predixv8.set-initial-price(btc-price)   -- bootstrap price bounds
+ *   5. Call predixv8.set-fee-recipient(deployer)     -- deployer = fee recipient
+ *   6. Call gatewayv7.set-sponsor(deployer)          -- deployer = sponsor
+ *   7. Call predixv8.seed-jackpot(200000000)         -- $200 USDCx jackpot seed
  *
  * Usage:
- *   ORACLE_MNEMONIC="..." node scripts/deploy-predixv7.mjs
+ *   ORACLE_MNEMONIC="..." node scripts/deploy-predixv8.mjs
  *
  * Optional env vars:
  *   SKIP_DEPLOY=1     -- skip deploy, only run setup calls (if contracts already deployed)
@@ -44,7 +44,7 @@ const { generateWallet, getStxAddress } = walletPkg
 const MNEMONIC = process.env.ORACLE_MNEMONIC
 if (!MNEMONIC) {
   console.error('ORACLE_MNEMONIC not set')
-  console.error('Usage: ORACLE_MNEMONIC="..." node scripts/deploy-predixv7.mjs')
+  console.error('Usage: ORACLE_MNEMONIC="..." node scripts/deploy-predixv8.mjs')
   process.exit(1)
 }
 
@@ -56,8 +56,8 @@ const CALL_FEE = 50000n      // 0.05 STX
 const NETWORK = STACKS_TESTNET
 
 const CONTRACTS = [
-  { name: 'predixv7', path: './contracts/predixv7.clar' },
-  { name: 'gatewayv6', path: './contracts/gatewayv6.clar' },
+  { name: 'predixv8', path: './contracts/predixv8.clar' },
+  { name: 'gatewayv7', path: './contracts/gatewayv7.clar' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -331,8 +331,8 @@ async function main() {
 
     // 3. set-gateway-bootstrap (predixv3 -- one-shot, no timelock)
     //    Points predixv3 to the just-deployed gatewayv2
-    const gatewayPrincipal = contractPrincipalCV(address, 'gatewayv6')
-    const r0 = await callContract(address, 'predixv7', 'set-gateway-bootstrap', [gatewayPrincipal], privateKey, nonce)
+    const gatewayPrincipal = contractPrincipalCV(address, 'gatewayv7')
+    const r0 = await callContract(address, 'predixv8', 'set-gateway-bootstrap', [gatewayPrincipal], privateKey, nonce)
     if (r0.ok) {
       console.log(`   [1/5] set-gateway-bootstrap(${address}.gatewayv2) -- OK`)
     } else {
@@ -342,7 +342,7 @@ async function main() {
 
     // 4. set-initial-price (predixv3, deployer-only, one-shot)
     const btcPrice = await fetchBtcPrice()
-    const r1 = await callContract(address, 'predixv7', 'set-initial-price', [uintCV(btcPrice)], privateKey, nonce)
+    const r1 = await callContract(address, 'predixv8', 'set-initial-price', [uintCV(btcPrice)], privateKey, nonce)
     if (r1.ok) {
       console.log(`   [2/5] set-initial-price(${btcPrice}) -- OK`)
     } else {
@@ -352,7 +352,7 @@ async function main() {
 
     // 5. set-fee-recipient (predixv3, deployer-only)
     //    Using deployer wallet as fee-recipient (same wallet for testnet)
-    const r2 = await callContract(address, 'predixv7', 'set-fee-recipient', [standardPrincipalCV(address)], privateKey, nonce)
+    const r2 = await callContract(address, 'predixv8', 'set-fee-recipient', [standardPrincipalCV(address)], privateKey, nonce)
     if (r2.ok) {
       console.log(`   [3/5] set-fee-recipient(${address}) -- OK`)
     } else {
@@ -362,11 +362,11 @@ async function main() {
 
     // 6. set-sponsor on gateway (gatewayv2, deployer-only)
     //    Using deployer wallet as sponsor (same wallet for testnet)
-    const r3 = await callContract(address, 'gatewayv6', 'set-sponsor', [standardPrincipalCV(address)], privateKey, nonce)
+    const r3 = await callContract(address, 'gatewayv7', 'set-sponsor', [standardPrincipalCV(address)], privateKey, nonce)
     if (r3.ok) {
-      console.log(`   [4/5] gatewayv6.set-sponsor(${address}) -- OK`)
+      console.log(`   [4/5] gatewayv7.set-sponsor(${address}) -- OK`)
     } else {
-      console.warn(`   [4/5] gatewayv6.set-sponsor FAILED`)
+      console.warn(`   [4/5] gatewayv7.set-sponsor FAILED`)
     }
     nonce = r3.nonce
 
@@ -374,7 +374,7 @@ async function main() {
     //    $200 = 200_000_000 micro-tokens (6 decimals)
     //    NOTE: deployer must have >= 200 USDCx tokens. Mint first if needed.
     const JACKPOT_SEED = 200_000_000
-    const r4 = await callContract(address, 'predixv7', 'seed-jackpot', [uintCV(JACKPOT_SEED)], privateKey, nonce)
+    const r4 = await callContract(address, 'predixv8', 'seed-jackpot', [uintCV(JACKPOT_SEED)], privateKey, nonce)
     if (r4.ok) {
       console.log(`   [5/5] seed-jackpot(${JACKPOT_SEED}) -- OK ($200 USDCx)`)
     } else {

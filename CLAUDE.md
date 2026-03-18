@@ -15,8 +15,8 @@ Prediction market where users bet on 1-minute BTC price movements (UP/DOWN). Bui
 ## Active Contracts (testnet)
 | Contract | Address | Purpose |
 |---|---|---|
-| **predixv7** | `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv7` | Main market + jackpot treasury |
-| **gatewayv6** | `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.gatewayv6` | Sponsor-only proxy |
+| **predixv8** | `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv8` | Main market + jackpot treasury |
+| **gatewayv7** | `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.gatewayv7` | Sponsor-only proxy |
 | **test-usdcx** | `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx` | Betting token |
 
 - **Deployer/Sponsor**: `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK` (same wallet for testnet)
@@ -28,7 +28,7 @@ Prediction market where users bet on 1-minute BTC price movements (UP/DOWN). Bui
 
 | Principle | Implementation |
 |---|---|
-| **Gateway-only** | ALL interactions (bets + settlement) go through gatewayv6. predixv7 rejects direct calls. |
+| **Gateway-only** | ALL interactions (bets + settlement) go through gatewayv7. predixv8 rejects direct calls. |
 | **Sponsor-only settlement** | Users never claim. Cron resolver settles rounds and distributes payouts automatically. |
 | **On-chain jackpot** | 1% of fees stays in contract as jackpot treasury. Ticket logic off-chain (Redis). |
 | **Pre-settlement window** | Bets close at 50s. Last 10s for server-side computation. |
@@ -39,15 +39,15 @@ Prediction market where users bet on 1-minute BTC price movements (UP/DOWN). Bui
 
 ```
 BETS:
-  User wallet -> Xverse sign -> /api/sponsor -> Gateway -> predixv7.place-bet
+  User wallet -> Xverse sign -> /api/sponsor -> Gateway -> predixv8.place-bet
 
 SETTLEMENT (automatic, every minute):
   Vercel Cron -> /api/cron/resolve -> Pyth Benchmarks
-    -> Gateway -> predixv7.resolve-and-distribute
+    -> Gateway -> predixv8.resolve-and-distribute
 
 JACKPOT DRAW (daily 21h ET):
   Vercel Cron -> /api/cron/jackpot-draw -> Bitcoin block hash
-    -> Gateway -> predixv7.pay-jackpot-winner
+    -> Gateway -> predixv8.pay-jackpot-winner
 ```
 
 ---
@@ -63,7 +63,7 @@ JACKPOT DRAW (daily 21h ET):
 
 ## Smart Contract Architecture
 
-### predixv7.clar (gateway-only)
+### predixv8.clar (gateway-only)
 
 **Data Maps:**
 ```clarity
@@ -96,7 +96,7 @@ round-bettors { round-id: uint }
 - `TRADING_WINDOW = u50`, `ROUND_DURATION = u60`
 - `PRICE_BOUND_BPS = u100` (1%), `TIMELOCK_BLOCKS = u144` (~24h)
 
-### gatewayv6.clar (thin proxy)
+### gatewayv7.clar (thin proxy)
 - `place-bet` -- Any user (via sponsor), round sanity check, not paused
 - `resolve-and-distribute` -- Sponsor-only
 - `pay-jackpot-winner` -- Sponsor-only
@@ -146,7 +146,7 @@ round-bettors { round-id: uint }
 ### Scripts
 | Script | Purpose |
 |---|---|
-| `scripts/deploy-predixv3.mjs` | Deploy predixv7 + gatewayv6 + setup calls |
+| `scripts/deploy-predixv3.mjs` | Deploy predixv8 + gatewayv7 + setup calls |
 | `scripts/resolver-daemon.mjs` | Fallback settlement daemon (Railway/Render) |
 
 ---
@@ -154,9 +154,9 @@ round-bettors { round-id: uint }
 ## Key Architecture Patterns
 
 ### 1. Gateway-Only + Sponsor Settlement
-Users never interact with predixv7 directly. All calls go through gatewayv6.
-- Bets: User -> Xverse sign -> `/api/sponsor` -> Gateway -> predixv7
-- Settlement: Cron -> `/api/sponsor` -> Gateway -> predixv7
+Users never interact with predixv8 directly. All calls go through gatewayv7.
+- Bets: User -> Xverse sign -> `/api/sponsor` -> Gateway -> predixv8
+- Settlement: Cron -> `/api/sponsor` -> Gateway -> predixv8
 - Users never claim. Payouts are pushed automatically.
 
 ### 2. Sponsored Transactions
@@ -189,8 +189,8 @@ Cron validates prices before settlement:
 ## Environment Variables
 ```
 NEXT_PUBLIC_STACKS_NETWORK=testnet
-NEXT_PUBLIC_BITPREDIX_CONTRACT_ID=ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv7
-NEXT_PUBLIC_GATEWAY_CONTRACT_ID=ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.gatewayv6
+NEXT_PUBLIC_BITPREDIX_CONTRACT_ID=ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.predixv8
+NEXT_PUBLIC_GATEWAY_CONTRACT_ID=ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.gatewayv7
 NEXT_PUBLIC_TEST_USDCX_CONTRACT_ID=ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK.test-usdcx
 ORACLE_MNEMONIC=<sponsor wallet mnemonic>
 UPSTASH_REDIS_REST_URL=<upstash url>
@@ -211,7 +211,7 @@ npm run test     # Run tests (vitest)
 - **`block-height` vs `stacks-block-height`** -- Clarity 3+ uses `stacks-block-height`. Using `block-height` causes silent deploy abort.
 - **Deploy script**: use `fetch` for broadcast (not `curl`)
 - **Nonce conflicts**: Rapid sequential bets require KV-based nonce tracking + Redis lock
-- **Gateway init**: predixv7 initializes gateway as DEPLOYER. Must call `set-gateway-bootstrap` after gatewayv6 is deployed.
+- **Gateway init**: predixv8 initializes gateway as DEPLOYER. Must call `set-gateway-bootstrap` after gatewayv7 is deployed.
 
 ## Tailwind Custom Colors
 ```

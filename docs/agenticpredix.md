@@ -88,7 +88,7 @@ Claude: → predix_market() → predix_place_bet(UP, 5)
 
 ### 0.1 Corrigir Contract IDs hardcoded
 
-**Problema**: Os endpoints agent/* tem fallbacks para `predixv2`/`predixv2-gateway`, mas o contrato ativo e `predixv7`/`gatewayv6`. Em local dev sem `.env.local`, todos os endpoints usam contratos errados **silenciosamente**.
+**Problema**: Os endpoints agent/* tem fallbacks para `predixv2`/`predixv2-gateway`, mas o contrato ativo e `predixv8`/`gatewayv7`. Em local dev sem `.env.local`, todos os endpoints usam contratos errados **silenciosamente**.
 
 **Arquivos afetados**:
 - `app/api/agent/market/route.ts` (linhas 24-26)
@@ -114,7 +114,7 @@ import { BITPREDIX_CONTRACT, GATEWAY_CONTRACT, TOKEN_CONTRACT, splitContractId }
 
 ### 0.3 Remover action "claim" do build-tx
 
-**Problema**: `build-tx` oferece action `claim`, mas predixv7 nao tem funcao de claim publica — settlement e sponsor-only. Alem disso, `buildClaimTx` chama `predixv7.claim-round-side` diretamente, violando a arquitetura gateway-only (a tx falharia on-chain de qualquer forma).
+**Problema**: `build-tx` oferece action `claim`, mas predixv8 nao tem funcao de claim publica — settlement e sponsor-only. Alem disso, `buildClaimTx` chama `predixv8.claim-round-side` diretamente, violando a arquitetura gateway-only (a tx falharia on-chain de qualquer forma).
 
 **Acao**: Remover `claim` de `VALID_ACTIONS` e do switch em `app/api/agent/build-tx/route.ts`. Remover `buildClaimTx` de `lib/agent-tx-builder.ts`. Sem backward-compatibility concern — funcao nunca funcionou.
 
@@ -126,9 +126,9 @@ import { BITPREDIX_CONTRACT, GATEWAY_CONTRACT, TOKEN_CONTRACT, splitContractId }
 
 ### 0.5 Verificar target do approve tx
 
-**Problema**: `buildApproveTx` em `lib/agent-tx-builder.ts` aprova `PREDIXV2_ID` (predixv7) como spender. Verificar no Clarity se quem faz `ft-transfer?` e predixv7 (correto) ou gatewayv6 (incorreto — precisa mudar target).
+**Problema**: `buildApproveTx` em `lib/agent-tx-builder.ts` aprova `PREDIXV2_ID` (predixv8) como spender. Verificar no Clarity se quem faz `ft-transfer?` e predixv8 (correto) ou gatewayv7 (incorreto — precisa mudar target).
 
-**Acao**: Ler `predixv7.clar` funcao `place-bet` para confirmar qual principal executa o `ft-transfer?`. Ajustar target do approve se necessario.
+**Acao**: Ler `predixv8.clar` funcao `place-bet` para confirmar qual principal executa o `ft-transfer?`. Ajustar target do approve se necessario.
 
 ### 0.6 Atualizar OpenAPI spec
 
