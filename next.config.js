@@ -10,6 +10,13 @@ const nextConfig = {
     '@stacks/network',
     '@stacks/wallet-sdk',
   ],
+  async rewrites() {
+    return [
+      // Standards expect .json extension for discovery manifests
+      { source: '/.well-known/agent.json', destination: '/.well-known/agent' },
+      { source: '/.well-known/ai-plugin.json', destination: '/.well-known/ai-plugin' },
+    ]
+  },
   async headers() {
     return [
       {
