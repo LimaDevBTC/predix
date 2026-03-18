@@ -11,41 +11,43 @@ export default function AgentDocsPage() {
           </h1>
           <p className="text-lg text-zinc-400">
             Build AI agents that trade on Predix. Zero gas fees. 1-minute BTC prediction rounds.
-            MCP, SDK, or raw REST -- your choice.
+            MCP, SDK, or raw REST -- your choice. Just a Stacks private key is all you need.
           </p>
         </div>
 
         {/* Quick Start */}
         <Section title="Quickstart (60 seconds)">
-          <Step n={1} title="Register (get API key)">
-            <Code>{`# Sign a message with your Stacks wallet to prove ownership
-curl -X POST https://bitpredix.vercel.app/api/agent/register \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "wallet": "ST1ABC...",
-    "signature": "...",
-    "message": "Predix Agent Registration 1710720000",
-    "name": "MyTradingBot"
-  }'
+          <div className="bg-zinc-900/50 border border-emerald-800/50 rounded-lg p-4 mb-6 text-sm text-zinc-300">
+            All you need is a <strong className="text-emerald-400">Stacks private key</strong>.
+            The SDKs and MCP server <strong className="text-white">auto-register</strong> on first use -- no manual API key setup required.
+          </div>
 
-# Response: { "apiKey": "pk_live_..." }  (shown ONCE)`}</Code>
+          <Step n={1} title="Get a Stacks private key">
+            <Code>{`# Generate a testnet wallet or use an existing one
+# Your private key is a 64-char hex string (+ optional 01 suffix)
+# Example: 753b7cc01a1a2e86221266a154af739463fce51219d97e4f856cd7200c3bd2a601`}</Code>
           </Step>
 
-          <Step n={2} title="Check market">
-            <Code>{`curl https://bitpredix.vercel.app/api/agent/market \\
-  -H "X-Predix-Key: pk_live_..."`}</Code>
+          <Step n={2} title="Pick your integration">
+            <Code>{`# MCP (Claude / Cursor) -- just set private key, auto-registers on startup
+# SDK (TypeScript)      -- just set private key, auto-registers on first call
+# SDK (Python)          -- just set private key, auto-registers on first call
+# REST API              -- call POST /api/agent/register manually (see below)`}</Code>
           </Step>
 
-          <Step n={3} title="Place a bet">
-            <Code>{`curl -X POST https://bitpredix.vercel.app/api/agent/build-tx \\
-  -H "X-Predix-Key: pk_live_..." \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "action": "place-bet",
-    "publicKey": "03abc...",
-    "params": { "side": "UP", "amount": 5 }
-  }'
-# Returns unsigned tx hex -> sign -> POST to /api/sponsor`}</Code>
+          <Step n={3} title="Start trading">
+            <Code>{`# That's it. Place your first bet:
+import { PredixClient } from '@predix/sdk'
+
+const predix = new PredixClient({
+  privateKey: process.env.STACKS_PRIVATE_KEY!,
+  // No apiKey needed -- auto-registers on first call
+})
+
+const market = await predix.market()
+if (market.round.tradingOpen) {
+  await predix.bet('UP', 5)
+}`}</Code>
           </Step>
         </Section>
 
@@ -53,6 +55,7 @@ curl -X POST https://bitpredix.vercel.app/api/agent/register \\
         <Section title="MCP Server (Claude / Cursor / Windsurf)">
           <p className="text-zinc-400 mb-4">
             The fastest way to integrate. Your AI assistant gets native Predix tools.
+            Auto-registers on startup -- just set your private key.
           </p>
           <Code>{`# Add to ~/.claude/claude_desktop_config.json:
 {
@@ -61,14 +64,14 @@ curl -X POST https://bitpredix.vercel.app/api/agent/register \\
       "command": "npx",
       "args": ["@predix/mcp"],
       "env": {
-        "PREDIX_API_KEY": "pk_live_...",
-        "STACKS_PRIVATE_KEY": "your-stacks-private-key"
+        "STACKS_PRIVATE_KEY": "your-stacks-private-key-hex"
       }
     }
   }
 }
 
-# Then tell Claude: "Aposta $5 UP no Predix"`}</Code>
+# That's it. Tell Claude: "Check the Predix market"
+# The MCP server auto-registers and gets an API key on startup.`}</Code>
 
           <h3 className="text-white font-semibold mt-6 mb-3">Available MCP Tools</h3>
           <div className="space-y-2">
@@ -87,8 +90,8 @@ curl -X POST https://bitpredix.vercel.app/api/agent/register \\
           <Code>{`import { PredixClient } from '@predix/sdk'
 
 const predix = new PredixClient({
-  apiKey: 'pk_live_...',
   privateKey: process.env.STACKS_PRIVATE_KEY!,
+  // apiKey is optional -- auto-registers on first call
 })
 
 // Read
@@ -116,8 +119,9 @@ for await (const m of predix.stream({ interval: 2000 })) {
           <Code>{`from predix import PredixClient
 
 client = PredixClient(
-    api_key="pk_live_...",
-    private_key="...",  # requires Node.js for signing
+    private_key="your-stacks-private-key-hex",
+    # api_key is optional -- auto-registers on first call
+    # requires Node.js for transaction signing
 )
 
 market = client.market()
@@ -128,7 +132,7 @@ if market.round.trading_open:
           <h3 className="text-white font-semibold mt-4 mb-2">LangChain Integration</h3>
           <Code>{`from predix.langchain import PredixToolkit
 
-toolkit = PredixToolkit(api_key="pk_live_...", private_key="...")
+toolkit = PredixToolkit(private_key="...")
 tools = toolkit.get_tools()
 # -> [PredixMarketTool, PredixOpportunitiesTool, PredixBetTool, ...]`}</Code>
         </Section>
@@ -155,8 +159,8 @@ tools = toolkit.get_tools()
         {/* Authentication */}
         <Section title="Authentication">
           <div className="text-zinc-400 space-y-3 text-sm">
-            <p>Pass your API key via header: <code className="text-emerald-400">X-Predix-Key: pk_live_...</code></p>
-            <p>Or: <code className="text-emerald-400">Authorization: Bearer pk_live_...</code></p>
+            <p><strong className="text-white">Auto-register (recommended):</strong> Set only your <code className="text-emerald-400">privateKey</code> in the SDK/MCP config. The first API call auto-registers your agent and obtains an API key.</p>
+            <p><strong className="text-white">Manual:</strong> Pass your API key via header: <code className="text-emerald-400">X-Predix-Key: pk_live_...</code> or <code className="text-emerald-400">Authorization: Bearer pk_live_...</code></p>
 
             <h3 className="text-white font-semibold mt-4">Rate Limits</h3>
             <table className="w-full mt-2">
