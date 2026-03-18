@@ -126,16 +126,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Check if wallet already registered
+    // Check if wallet already registered — re-register regenerates key
     const existing = await getAgentByWallet(wallet)
     if (existing) {
+      // Valid signature proves ownership — regenerate key so auto-register always works
+      const { revokeAgentKey } = await import('@/lib/agent-keys')
+      await revokeAgentKey(existing.keyHash)
+      const result = await generateAgentKey(wallet, name || existing.name, description || existing.description)
+
       return NextResponse.json({
         ok: true,
-        message: 'Wallet already registered. API key was shown at registration time and cannot be retrieved.',
-        prefix: existing.keyPrefix,
+        apiKey: result.key,
+        prefix: result.prefix,
         wallet,
         tier: existing.tier,
         limits: { requestsPerMinute: existing.tier === 'verified' ? 120 : 30 },
+        regenerated: true,
       })
     }
 

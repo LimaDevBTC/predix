@@ -13,7 +13,7 @@ import type {
   ResolutionResult,
 } from './types.js'
 import { PredixError, TradingClosedError, RateLimitError, AuthenticationError } from './errors.js'
-import { getPublicKey, getAddress, signTransaction } from './signer.js'
+import { getPublicKey, getAddress, signTransaction, signMessage } from './signer.js'
 
 const DEFAULT_BASE_URL = 'https://www.predix.live'
 
@@ -23,9 +23,10 @@ export class PredixClient {
   private baseUrl: string
   private network: 'testnet' | 'mainnet'
   private _address?: string
+  private _autoRegistered = false
 
   constructor(config: PredixClientConfig) {
-    this.apiKey = config.apiKey
+    this.apiKey = config.apiKey || ''
     this.privateKey = config.privateKey
     this.baseUrl = config.baseUrl || DEFAULT_BASE_URL
     this.network = config.network || 'testnet'
@@ -40,9 +41,44 @@ export class PredixClient {
     return this._address
   }
 
+  // ---- Auto-registration ----
+
+  /**
+   * Auto-register: if no API key but private key is available,
+   * sign a registration message and get a key automatically.
+   */
+  async register(name?: string): Promise<string> {
+    const pk = this.requirePrivateKey()
+    const timestamp = Math.floor(Date.now() / 1000)
+    const message = `Predix Agent Registration ${timestamp}`
+    const signature = signMessage(message, pk)
+
+    const url = `${this.baseUrl}/api/agent/register`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet: this.address, signature, message, name: name || 'SDK Agent' }),
+    })
+    const data = await res.json() as Record<string, unknown>
+    if (!data.ok || !data.apiKey) throw new PredixError('Auto-registration failed: ' + (data.error || 'no key returned'))
+
+    this.apiKey = data.apiKey as string
+    return this.apiKey
+  }
+
+  private async ensureApiKey(): Promise<void> {
+    if (this.apiKey) return
+    if (!this.privateKey) throw new AuthenticationError('No apiKey or privateKey configured')
+    if (this._autoRegistered) throw new AuthenticationError('Auto-registration already attempted — check your private key')
+    this._autoRegistered = true
+    await this.register()
+  }
+
   // ---- HTTP ----
 
   private async fetch<T>(path: string, options?: RequestInit): Promise<T> {
+    await this.ensureApiKey()
+
     const url = `${this.baseUrl}${path}`
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

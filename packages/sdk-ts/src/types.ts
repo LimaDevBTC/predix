@@ -1,5 +1,7 @@
 export interface PredixClientConfig {
-  apiKey: string
+  /** API key (pk_live_...). If omitted and privateKey is set, auto-registers on first call. */
+  apiKey?: string
+  /** Stacks private key hex. Required for trading. Enables auto-registration if no apiKey. */
   privateKey?: string
   baseUrl?: string
   network?: 'testnet' | 'mainnet'

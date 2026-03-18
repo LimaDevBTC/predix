@@ -34,24 +34,22 @@ DEFAULT_BASE_URL = "https://www.predix.live"
 class PredixClient:
     def __init__(
         self,
-        api_key: str,
+        api_key: Optional[str] = None,
         private_key: Optional[str] = None,
         base_url: str = DEFAULT_BASE_URL,
         network: str = "testnet",
     ):
-        self.api_key = api_key
+        self.api_key = api_key or ""
         self.private_key = private_key
         self.base_url = base_url.rstrip("/")
         self.network = network
         self._http = httpx.Client(
             base_url=self.base_url,
-            headers={
-                "Content-Type": "application/json",
-                "X-Predix-Key": self.api_key,
-            },
+            headers={"Content-Type": "application/json"},
             timeout=15.0,
         )
         self._address: Optional[str] = None
+        self._auto_registered = False
 
     @property
     def address(self) -> str:
@@ -88,8 +86,53 @@ class PredixClient:
         self._public_key = data["publicKey"]
         return data["address"]
 
-    def _request(self, method: str, path: str, **kwargs) -> dict:
+    def _ensure_api_key(self):
+        """Auto-register if no API key but private key is available."""
+        if self.api_key:
+            return
+        if not self.private_key:
+            raise AuthenticationError("No api_key or private_key configured")
+        if self._auto_registered:
+            raise AuthenticationError("Auto-registration already attempted")
+        self._auto_registered = True
+        self.register()
+
+    def register(self, name: str = "Python Agent") -> str:
+        """Register agent and get API key. Called automatically if only private_key is set."""
+        if not self.private_key:
+            raise PredixError("private_key required for registration")
+        import time
+        timestamp = int(time.time())
+        message = f"Predix Agent Registration {timestamp}"
+        signature = self._sign_message(message)
+        data = self._raw_request("POST", "/api/agent/register", json={
+            "wallet": self.address,
+            "signature": signature,
+            "message": message,
+            "name": name,
+        })
+        if not data.get("apiKey"):
+            raise PredixError("Auto-registration failed: " + data.get("error", "no key returned"))
+        self.api_key = data["apiKey"]
+        return self.api_key
+
+    def _sign_message(self, message: str) -> str:
+        data = self._call_signer("signMessage", message=message)
+        return data["signature"]
+
+    def _raw_request(self, method: str, path: str, **kwargs) -> dict:
+        """Request without API key header (for registration)."""
         res = self._http.request(method, path, **kwargs)
+        data = res.json()
+        if not res.is_success or data.get("error"):
+            raise PredixError(data.get("error", f"API error: {res.status_code}"), res.status_code)
+        return data
+
+    def _request(self, method: str, path: str, **kwargs) -> dict:
+        self._ensure_api_key()
+        headers = kwargs.pop("headers", {})
+        headers["X-Predix-Key"] = self.api_key
+        res = self._http.request(method, path, headers=headers, **kwargs)
         data = res.json()
 
         if res.status_code == 401:

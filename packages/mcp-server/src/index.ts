@@ -34,7 +34,7 @@ import type {
   OpportunitiesResponse,
   SponsorResponse,
 } from './lib/client.js'
-import { getPublicKey, signTransaction } from './lib/signer.js'
+import { getPublicKey, signTransaction, signMessage } from './lib/signer.js'
 import { getStxAddress } from '@stacks/wallet-sdk'
 
 function getPrivateKey(): string {
@@ -89,6 +89,37 @@ async function executeAction(action: 'approve' | 'mint'): Promise<{ txid: string
   })
 
   return { txid: sponsorRes.txid }
+}
+
+/**
+ * Auto-register: if STACKS_PRIVATE_KEY is set but no PREDIX_API_KEY,
+ * sign a registration message and call /api/agent/register to get a key.
+ * Zero friction — agent only needs a private key.
+ */
+async function ensureApiKey(): Promise<void> {
+  if (process.env.PREDIX_API_KEY) return // already configured
+
+  const privateKey = process.env.STACKS_PRIVATE_KEY
+  if (!privateKey) return // can't auto-register without a private key
+
+  const address = getAgentAddress()
+  const timestamp = Math.floor(Date.now() / 1000)
+  const message = `Predix Agent Registration ${timestamp}`
+  const signature = signMessage(message, privateKey)
+
+  try {
+    const res = await fetchApi<{ ok: boolean; apiKey?: string }>('/api/agent/register', {
+      method: 'POST',
+      body: JSON.stringify({ wallet: address, signature, message, name: 'MCP Agent' }),
+    })
+
+    if (res.apiKey) {
+      process.env.PREDIX_API_KEY = res.apiKey
+      console.error(`[predix] Auto-registered agent ${address} — API key set`)
+    }
+  } catch (err) {
+    console.error('[predix] Auto-registration failed (continuing without key):', err instanceof Error ? err.message : err)
+  }
 }
 
 // ---- MCP Server Setup ----
@@ -276,6 +307,7 @@ server.tool(
 // ---- Start Server ----
 
 async function main() {
+  await ensureApiKey()
   const transport = new StdioServerTransport()
   await server.connect(transport)
   console.error('Predix MCP Server running on stdio')
