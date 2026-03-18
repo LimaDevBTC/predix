@@ -236,6 +236,15 @@ export async function POST(req: NextRequest) {
       const usedSponsorNonce = auth.sponsorSpendingCondition?.nonce
       console.log(`[sponsor] Attempt ${attempt}: origin=${usedOriginNonce}, sponsor=${usedSponsorNonce}`)
 
+      // Debug: compare payload before/after sponsoring
+      const inputPayloadHex = transaction.serialize().slice(-200)
+      const outputPayloadHex = sponsoredTx.serialize().slice(-200)
+      if (inputPayloadHex !== outputPayloadHex) {
+        console.warn(`[sponsor] PAYLOAD CHANGED after sponsorTransaction!`)
+        console.warn(`[sponsor]   input tail:  ${inputPayloadHex}`)
+        console.warn(`[sponsor]   output tail: ${outputPayloadHex}`)
+      }
+
       let result: Record<string, unknown>
       try {
         const txHex = sponsoredTx.serialize()
