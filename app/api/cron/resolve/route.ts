@@ -23,6 +23,7 @@ import {
   getRoundsWithBets,
   removeResolvedRound,
   getActiveUserCount,
+  getRoundBettorValidity,
 } from '@/lib/pool-store'
 
 export const dynamic = 'force-dynamic'
@@ -383,12 +384,15 @@ async function processRound(
 
     // 5. Post-settlement: credit jackpot tickets in Redis (off-chain)
     // NOTE: Jackpot balance accumulation is now on-chain (1% stays in contract).
-    // We only credit tickets here for the daily draw lottery.
+    // Tickets only credited for VALID rounds: 2+ distinct wallets on opposite sides.
+    // Same wallet betting both sides does NOT count as valid counterparty.
     try {
-      const hasCounterparty = round.totalUp > 0 && round.totalDown > 0
-      if (hasCounterparty) {
+      const validity = await getRoundBettorValidity(roundId)
+      if (validity.hasCounterparty) {
         await creditTicketsAfterSettlement(roundId.toString(), [])
-        clog({ action: 'jackpot-tickets', detail: 'tickets credited (balance on-chain)' })
+        clog({ action: 'jackpot-tickets', detail: `tickets credited (${validity.uniqueWallets} wallets, UP=${validity.upBettors} DOWN=${validity.downBettors})` })
+      } else {
+        clog({ action: 'jackpot-skip', detail: `no valid counterparty (${validity.uniqueWallets} unique wallets)` })
       }
     } catch (e) {
       clog({ action: 'warn', detail: 'Jackpot ticket credit failed (non-fatal)', error: String(e) })
