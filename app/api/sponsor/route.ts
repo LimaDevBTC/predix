@@ -231,11 +231,11 @@ export async function POST(req: NextRequest) {
 
       let result: Record<string, unknown>
       try {
-        const txBytes = sponsoredTx.serialize()
+        const txHex = sponsoredTx.serialize()
         const broadcastRes = await fetch(`${HIRO_API}/v2/transactions`, {
           method: 'POST',
-          headers: hiroHeaders({ 'Content-Type': 'application/octet-stream' }),
-          body: typeof txBytes === 'string' ? Buffer.from(txBytes, 'hex') : txBytes,
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: txHex,
         })
         const responseText = await broadcastRes.text()
         try {
