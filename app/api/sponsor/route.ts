@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   deserializeTransaction,
   sponsorTransaction,
-  broadcastTransaction,
   PayloadType,
 } from '@stacks/transactions'
 import { generateWallet, getStxAddress } from '@stacks/wallet-sdk'
 import { NETWORK_NAME, BITPREDIX_CONTRACT, GATEWAY_CONTRACT, TOKEN_CONTRACT } from '@/lib/config'
+
+// Force Node.js runtime (not Edge) — Buffer + full Node APIs available
+export const runtime = 'nodejs'
+
+const HIRO_API = NETWORK_NAME === 'mainnet'
+  ? 'https://api.mainnet.hiro.so'
+  : 'https://api.testnet.hiro.so'
 import {
   getSponsorNonce,
   setSponsorNonce,
@@ -232,9 +238,33 @@ export async function POST(req: NextRequest) {
 
       let result: Record<string, unknown>
       try {
-        result = await broadcastTransaction({ transaction: sponsoredTx, network: NETWORK_NAME }) as Record<string, unknown>
-        console.log(`[sponsor] Broadcast result:`, JSON.stringify(result).slice(0, 300))
+        const txHex = sponsoredTx.serialize()
+        const broadcastRes = await fetch(`${HIRO_API}/v2/transactions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: Buffer.from(txHex, 'hex'),
+        })
+        const responseText = await broadcastRes.text()
+        console.log(`[sponsor] Broadcast response (${broadcastRes.status}): ${responseText.slice(0, 300)}`)
+
+        // Successful broadcast returns a JSON-encoded txid string: "0xabcd..."
+        const trimmed = responseText.replace(/^"|"$/g, '').trim()
+        if (broadcastRes.ok && /^0x[0-9a-f]{64}$/i.test(trimmed)) {
+          result = { txid: trimmed }
+        } else {
+          try {
+            result = JSON.parse(responseText)
+          } catch {
+            // Plain text error from node
+            if (attempt < MAX_RETRIES) {
+              await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+              continue
+            }
+            throw new Error(trimmed || `Broadcast failed (HTTP ${broadcastRes.status})`)
+          }
+        }
       } catch (broadcastErr) {
+        if (broadcastErr instanceof Error && broadcastErr.message.startsWith('Broadcast failed')) throw broadcastErr
         const msg = broadcastErr instanceof Error ? broadcastErr.message : String(broadcastErr)
         console.warn(`[sponsor] Broadcast exception attempt ${attempt}: ${msg}`)
         if (attempt < MAX_RETRIES) {
