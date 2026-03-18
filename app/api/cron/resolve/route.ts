@@ -43,7 +43,7 @@ const TX_FEE = BigInt(process.env.SPONSOR_TX_FEE || '50000')
 
 // Circuit breaker thresholds
 const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD || '0.005')
-const PRICE_DIVERGENCE_THRESHOLD = 0.05 // TEMP: 5% to resolve stale rounds (revert after)
+const PRICE_DIVERGENCE_THRESHOLD = 0.003 // 0.3% Hermes vs Benchmarks
 const PRICE_SANE_MIN = 10_000 * 100 // $10k in cents
 const PRICE_SANE_MAX = 500_000 * 100 // $500k in cents
 
