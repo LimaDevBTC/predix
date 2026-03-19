@@ -235,23 +235,39 @@ export async function POST(req: NextRequest) {
       const usedOriginNonce = auth.spendingCondition?.nonce
       const usedSponsorNonce = auth.sponsorSpendingCondition?.nonce
 
-      // Debug: compare wallet hex vs re-serialized hex
+      // Debug: compare wallet hex vs re-serialized hex vs sponsored hex
       const walletReserialize = transaction.serialize()
       const sponsoredHex = sponsoredTx.serialize()
-      const payloadChanged = walletReserialize.slice(-200) !== sponsoredHex.slice(-200)
+
+      // Find first diff between wallet input and round-tripped
+      let diffPos = -1
+      for (let i = 0; i < Math.max(txHex.length, walletReserialize.length); i++) {
+        if (txHex[i] !== walletReserialize[i]) { diffPos = i; break }
+      }
+      // Find first diff between wallet input and sponsored
+      let diffPosSponsor = -1
+      for (let i = 0; i < Math.max(txHex.length, sponsoredHex.length); i++) {
+        if (txHex[i] !== sponsoredHex[i]) { diffPosSponsor = i; break }
+      }
+
       const debugInfo = {
-        walletHexIn: txHex.slice(0, 80),
-        walletReserialize: walletReserialize.slice(0, 80),
-        sponsoredHex: sponsoredHex.slice(0, 80),
         walletHexLen: txHex.length,
         resLen: walletReserialize.length,
         sponsoredLen: sponsoredHex.length,
-        payloadChanged,
         walletMatchesReserialize: txHex === walletReserialize,
+        diffPos,
+        diffContext: diffPos >= 0 ? {
+          wallet:   txHex.slice(Math.max(0, diffPos - 20), diffPos + 40),
+          reserial: walletReserialize.slice(Math.max(0, diffPos - 20), diffPos + 40),
+        } : null,
+        diffPosSponsor,
+        // Return FULL wallet hex and sponsored hex (only ~624 chars each)
+        walletHexFull: txHex,
+        sponsoredHexFull: sponsoredHex,
         originNonce: String(usedOriginNonce),
         sponsorNonce: String(usedSponsorNonce),
       }
-      console.log(`[sponsor] Debug:`, JSON.stringify(debugInfo))
+      console.log(`[sponsor] diffPos=${diffPos} diffPosSponsor=${diffPosSponsor}`)
 
       let result: Record<string, unknown>
       try {
