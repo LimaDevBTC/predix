@@ -25,14 +25,6 @@ export interface IndexedBet {
   early: boolean      // bet placed in first 20s (jackpot eligible)
 }
 
-export interface JackpotData {
-  snapshot: number       // jackpot balance frozen on first claim (micro-units)
-  earlyUp: number        // total early UP bets (micro-units)
-  earlyDown: number      // total early DOWN bets (micro-units)
-  distributed: number    // total bonus paid out (micro-units)
-  locked: boolean        // true after first claim
-}
-
 export interface IndexedRound {
   roundId: number
   startTimestamp: number
@@ -47,7 +39,6 @@ export interface IndexedRound {
   bets: IndexedBet[]
   participantCount: number
   lastUpdated: number
-  jackpot?: JackpotData
 }
 
 export interface WalletStats {
@@ -75,7 +66,6 @@ export interface ProfileBetRecord {
   priceEnd: number | null
   txId: string
   early: boolean
-  jackpotBonus: number   // jackpot bonus received (USD), 0 if not eligible
 }
 
 export interface EquityPoint {
@@ -102,8 +92,6 @@ export interface WalletProfile {
     longestLoseStreak: number
     currentStreak: { type: 'win' | 'loss'; count: number }
     sideDistribution: { upVolume: number; downVolume: number }
-    totalJackpotEarned: number
-    jackpotWins: number
   }
   equityCurve: EquityPoint[]
   recentBets: ProfileBetRecord[]
@@ -468,40 +456,6 @@ async function enrichUnresolvedRounds(): Promise<void> {
   }
 }
 
-/**
- * Compute jackpot data off-chain from early bets in each resolved round.
- * predixv8 doesn't have a round-jackpot map — jackpot is 1% of total pool
- * volume, and early bet pools are computed from bet timestamps.
- */
-function computeJackpotData(): void {
-  for (const round of roundsIndex.values()) {
-    if (!round.resolved || round.jackpot) continue
-
-    const activeBets = round.bets.filter(b => b.status === 'success')
-    const hasCounterparty = activeBets.some(b => b.side === 'UP') && activeBets.some(b => b.side === 'DOWN')
-    if (!hasCounterparty) continue
-
-    const earlyBets = activeBets.filter(b => b.early)
-    if (earlyBets.length === 0) continue
-
-    // Jackpot snapshot = 1% of total pool volume (micro-units)
-    const totalPoolMicro = activeBets.reduce((s, b) => s + b.amount, 0)
-    const snapshot = Math.floor(totalPoolMicro * 0.01)
-
-    const earlyUp = earlyBets.filter(b => b.side === 'UP').reduce((s, b) => s + b.amount, 0)
-    const earlyDown = earlyBets.filter(b => b.side === 'DOWN').reduce((s, b) => s + b.amount, 0)
-
-    round.jackpot = {
-      snapshot,
-      earlyUp,
-      earlyDown,
-      distributed: snapshot, // fully distributed to early winners
-      locked: true,
-    }
-    round.lastUpdated = Date.now()
-  }
-}
-
 // ============================================================================
 // REDIS CACHE — persist index across Vercel cold starts
 // ============================================================================
@@ -677,9 +631,8 @@ async function doScan(now: number): Promise<void> {
     }
     await Promise.all(mempoolPromises)
 
-    // Enrich unresolved rounds with on-chain data + compute jackpot from early bets
+    // Enrich unresolved rounds with on-chain data
     await enrichUnresolvedRounds()
-    computeJackpotData()
 
     lastScanTimestamp = now
     initialScanDone = true
@@ -857,15 +810,6 @@ export async function getWalletProfile(
         }
       }
 
-      // Calculate jackpot bonus for early winning bets
-      let jackpotBonus = 0
-      if (bet.early && round.resolved && round.outcome && bet.side === round.outcome && round.jackpot && round.jackpot.locked) {
-        const earlyWinPool = round.outcome === 'UP' ? round.jackpot.earlyUp : round.jackpot.earlyDown
-        if (earlyWinPool > 0) {
-          jackpotBonus = (bet.amount / earlyWinPool) * round.jackpot.snapshot / 1e6
-        }
-      }
-
       allBetRecords.push({
         roundId: round.roundId,
         timestamp: round.endTimestamp,
@@ -875,13 +819,12 @@ export async function getWalletProfile(
         resolved: round.resolved,
         totalPool: round.totalPoolUsd,
         winningPool,
-        pnl: pnl + jackpotBonus,
+        pnl,
         poolSharePct,
         priceStart: round.priceStart,
         priceEnd: round.priceEnd,
         txId: bet.txId,
         early: bet.early,
-        jackpotBonus,
       })
     }
   }
@@ -892,7 +835,6 @@ export async function getWalletProfile(
   let bestWin = 0, worstLoss = 0
   let upVolume = 0, downVolume = 0
   let totalVolume = 0
-  let totalJackpotEarned = 0, jackpotWins = 0
   let curStreak = 0, curStreakType: 'win' | 'loss' = 'win'
   let longestWin = 0, longestLose = 0
 
@@ -912,11 +854,6 @@ export async function getWalletProfile(
     totalPnl += bet.pnl
     cumPnl += bet.pnl
     equityCurve.push({ time: bet.timestamp, value: cumPnl })
-
-    if (bet.jackpotBonus > 0) {
-      totalJackpotEarned += bet.jackpotBonus
-      jackpotWins++
-    }
 
     if (bet.pnl > bestWin) bestWin = bet.pnl
     if (bet.pnl < worstLoss) worstLoss = bet.pnl
@@ -961,8 +898,6 @@ export async function getWalletProfile(
       longestLoseStreak: longestLose,
       currentStreak: { type: curStreakType, count: curStreak },
       sideDistribution: { upVolume, downVolume },
-      totalJackpotEarned,
-      jackpotWins,
     },
     equityCurve,
     recentBets,
@@ -1087,10 +1022,6 @@ export interface GlobalStats {
   uniqueWallets: number
   largestPool: number
   avgPoolSize: number
-  totalJackpotDistributed: number
-  jackpotRounds: number
-  largestJackpot: number
-  avgJackpotSize: number
 }
 
 export async function getGlobalStats(): Promise<GlobalStats> {
@@ -1102,9 +1033,6 @@ export async function getGlobalStats(): Promise<GlobalStats> {
   let downWins = 0
   const uniqueWallets = new Set<string>()
   let largestPool = 0
-  let totalJackpotDistributed = 0
-  let jackpotRounds = 0
-  let largestJackpot = 0
 
   for (const round of roundsIndex.values()) {
     if (round.totalPoolUsd === 0) continue
@@ -1119,13 +1047,6 @@ export async function getGlobalStats(): Promise<GlobalStats> {
     for (const bet of round.bets) {
       if (bet.status === 'success') uniqueWallets.add(bet.user)
     }
-    // Jackpot aggregation
-    if (round.jackpot && round.jackpot.locked && round.jackpot.snapshot > 0) {
-      const jpUsd = round.jackpot.snapshot / 1e6
-      totalJackpotDistributed += jpUsd
-      jackpotRounds++
-      if (jpUsd > largestJackpot) largestJackpot = jpUsd
-    }
   }
 
   return {
@@ -1137,10 +1058,6 @@ export async function getGlobalStats(): Promise<GlobalStats> {
     uniqueWallets: uniqueWallets.size,
     largestPool,
     avgPoolSize: totalRounds > 0 ? totalVolume / totalRounds : 0,
-    totalJackpotDistributed,
-    jackpotRounds,
-    largestJackpot,
-    avgJackpotSize: jackpotRounds > 0 ? totalJackpotDistributed / jackpotRounds : 0,
   }
 }
 

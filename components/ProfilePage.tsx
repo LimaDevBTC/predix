@@ -28,7 +28,6 @@ interface ProfileBetRecord {
   priceEnd: number | null
   txId: string
   early: boolean
-  jackpotBonus: number
 }
 
 interface EquityPoint {
@@ -52,8 +51,6 @@ interface ProfileStats {
   longestLoseStreak: number
   currentStreak: { type: 'win' | 'loss'; count: number }
   sideDistribution: { upVolume: number; downVolume: number }
-  totalJackpotEarned: number
-  jackpotWins: number
 }
 
 interface WalletProfile {
@@ -219,7 +216,7 @@ function BetRow({ bet, expanded, onToggle }: {
           <div className="flex items-center gap-2">
             <span className={`text-xs font-medium ${bet.side === 'UP' ? 'text-up' : 'text-down'}`}>
               {bet.side} {bet.side === 'UP' ? '\u2191' : '\u2193'}
-              {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Jackpot eligible">J</span>}
+              {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Ticket eligible">T</span>}
             </span>
             <span className="text-zinc-300 font-mono text-xs">${formatUsd(bet.amountUsd)}</span>
           </div>
@@ -255,7 +252,7 @@ function BetRow({ bet, expanded, onToggle }: {
           bet.side === 'UP' ? 'text-up' : 'text-down'
         }`}>
           {bet.side} {bet.side === 'UP' ? '\u2191' : '\u2193'}
-          {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Jackpot eligible">J</span>}
+          {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Ticket eligible">T</span>}
         </span>
 
         {/* Amount */}
