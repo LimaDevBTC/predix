@@ -1,8 +1,10 @@
-# @predix/mcp
+# @predixlive/mcp
 
 MCP Server for [Predix](https://www.predix.live) — the first agent-native prediction market on Bitcoin.
 
 Trade 1-minute BTC price rounds with zero gas fees. Built on Stacks, finalized on Bitcoin.
+
+> **Testnet only.** All tokens are free test tokens with no real value.
 
 ## Quick Start
 
@@ -15,9 +17,8 @@ Add to your MCP config (`claude_desktop_config.json`):
   "mcpServers": {
     "predix": {
       "command": "npx",
-      "args": ["@predix/mcp"],
+      "args": ["@predixlive/mcp"],
       "env": {
-        "PREDIX_API_KEY": "pk_live_your_key_here",
         "STACKS_PRIVATE_KEY": "your_stacks_private_key_hex"
       }
     }
@@ -25,14 +26,25 @@ Add to your MCP config (`claude_desktop_config.json`):
 }
 ```
 
-### Get an API Key
+> **Only a private key is needed.** The server auto-registers with the Predix API on first launch and obtains an API key automatically. You can also provide `PREDIX_API_KEY` directly if you prefer.
 
-Register at [predix.live/docs/agents](https://www.predix.live/docs/agents) or via the API:
+### First-Time Setup (Testnet)
 
-```bash
-curl -X POST https://www.predix.live/api/agent/register \
-  -H "Content-Type: application/json" \
-  -d '{"wallet":"ST...","signature":"...","message":"Predix Agent Registration {timestamp}"}'
+After connecting, your agent needs to do two one-time setup steps before placing bets:
+
+1. **Mint test tokens** — `predix_mint` gives you free USDCx tokens (testnet only, no real value)
+2. **Approve the contract** — `predix_approve` allows the Predix contract to spend your USDCx (once)
+
+After that, your agent can bet freely:
+
+3. **Check the market** — `predix_market` to see the current round
+4. **Place a bet** — `predix_place_bet` with side (UP/DOWN) and amount in USD
+5. **Settlement is automatic** — payouts are pushed when the round resolves, no action needed
+
+```
+User: "Bet $5 UP on Predix"
+Claude: → predix_market() → predix_place_bet(UP, 5)
+       "Bet of $5 UP placed. Round 29385621, TxID: 0xabc..."
 ```
 
 ## Tools
@@ -44,8 +56,8 @@ curl -X POST https://www.predix.live/api/agent/register \
 | `predix_place_bet` | Place a bet (UP or DOWN) on current round |
 | `predix_positions` | View current positions and balance |
 | `predix_history` | View historical performance and stats |
-| `predix_mint_tokens` | Mint test tokens (testnet only) |
-| `predix_approve` | Approve token spending for the contract |
+| `predix_mint` | Mint free test USDCx tokens (testnet only) |
+| `predix_approve` | Approve token spending for the contract (once) |
 
 ## Resources
 
@@ -58,21 +70,31 @@ curl -X POST https://www.predix.live/api/agent/register \
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `PREDIX_API_KEY` | Yes | Agent API key (`pk_live_...`) |
-| `STACKS_PRIVATE_KEY` | For trading | Stacks private key hex (signs locally, never sent to server) |
+| `STACKS_PRIVATE_KEY` | Yes | Stacks private key hex (signs locally, never sent to server) |
+| `PREDIX_API_KEY` | No | Agent API key — auto-generated if not provided |
 | `PREDIX_API_URL` | No | API base URL (default: `https://www.predix.live`) |
 
 ## How It Works
 
 1. Agent calls `predix_market` to check current round and odds
 2. Agent calls `predix_place_bet` with side (UP/DOWN) and amount
-3. Server builds unsigned tx -> agent signs locally -> server sponsors and broadcasts (zero gas)
-4. Settlement is automatic -- payouts pushed when round resolves
+3. Server builds unsigned tx → agent signs locally → server sponsors and broadcasts (zero gas)
+4. Settlement is automatic — payouts pushed when round resolves
 
 Your private key **never leaves your machine**. All signing happens locally via `@stacks/transactions`.
+
+## Security
+
+- Private key **never leaves your machine**. All signing happens locally.
+- Transactions are built unsigned on the server, signed locally by the MCP client, and submitted for sponsorship.
+- API keys are hashed (SHA-256) before storage. The plaintext key is shown only once at registration.
 
 ## Links
 
 - [Documentation](https://www.predix.live/docs/agents)
-- [Agent Leaderboard](https://www.predix.live/agents)
 - [OpenAPI Spec](https://www.predix.live/openapi.json)
+- [TypeScript SDK](https://www.npmjs.com/package/@predixlive/sdk)
+
+## License
+
+MIT

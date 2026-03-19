@@ -45,8 +45,30 @@ Write operations (bet, mint, approve) require Node.js (>=18) for Stacks transact
 npm install -g @stacks/transactions @stacks/wallet-sdk
 ```
 
+## API
+
+### Read Methods (no private key)
+- `client.market()` -- Current round, pools, odds, prices
+- `client.opportunities()` -- Trading signals, imbalance, streaks
+- `client.positions()` -- Active bets, pending rounds, balance
+- `client.history()` -- Win rate, P&L, ROI, bet history
+
+### Write Methods (requires private key)
+- `client.bet(side, amount)` -- Place bet (UP/DOWN, min $1)
+- `client.mint()` -- Mint test USDCx (testnet)
+- `client.approve()` -- Approve token spending (once)
+
+## Security
+
+All signing happens locally via a Node.js subprocess. The private key is never transmitted to the server. Transactions are built unsigned by the platform, signed on your machine, and submitted for sponsorship.
+
 ## Links
 
 - [Documentation](https://www.predix.live/docs/agents)
 - [MCP Server](https://www.npmjs.com/package/@predix/mcp)
 - [TypeScript SDK](https://www.npmjs.com/package/@predix/sdk)
+- [OpenAPI Spec](https://www.predix.live/openapi.json)
+
+## License
+
+MIT

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { CircleCheck, CircleX, Ticket, Clock } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { Footer } from './Footer'
 
@@ -214,9 +215,9 @@ function BetRow({ bet, expanded, onToggle }: {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-medium ${bet.side === 'UP' ? 'text-up' : 'text-down'}`}>
+            <span className={`inline-flex items-center gap-1 text-xs font-medium ${bet.side === 'UP' ? 'text-up' : 'text-down'}`}>
               {bet.side} {bet.side === 'UP' ? '\u2191' : '\u2193'}
-              {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Ticket eligible">T</span>}
+              {bet.early && <span title="Ticket eligible"><Ticket size={9} className="ml-0.5 text-bitcoin" /></span>}
             </span>
             <span className="text-zinc-300 font-mono text-xs">${formatUsd(bet.amountUsd)}</span>
           </div>
@@ -228,11 +229,16 @@ function BetRow({ bet, expanded, onToggle }: {
         </div>
         <div className="flex items-center justify-between mt-1">
           <span className="text-[10px] text-zinc-500">{timeAgo(bet.timestamp)}</span>
-          <span className={`text-[10px] ${
+          <span className={`inline-flex items-center gap-0.5 text-[10px] ${
             !bet.resolved ? 'text-zinc-500' :
             bet.outcome === bet.side ? 'text-up' : 'text-down'
           }`}>
-            {!bet.resolved ? 'pending' : `${bet.outcome === bet.side ? 'Won \u2713' : 'Lost \u2717'}`}
+            {!bet.resolved
+              ? <><Clock size={9} className="text-zinc-500" /> pending</>
+              : bet.outcome === bet.side
+                ? <><CircleCheck size={9} /> Won</>
+                : <><CircleX size={9} /> Lost</>
+            }
           </span>
         </div>
       </button>
@@ -248,11 +254,11 @@ function BetRow({ bet, expanded, onToggle }: {
         </span>
 
         {/* Side */}
-        <span className={`text-xs font-medium w-12 shrink-0 whitespace-nowrap ${
+        <span className={`inline-flex items-center gap-0.5 text-xs font-medium w-14 shrink-0 whitespace-nowrap ${
           bet.side === 'UP' ? 'text-up' : 'text-down'
         }`}>
           {bet.side} {bet.side === 'UP' ? '\u2191' : '\u2193'}
-          {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Ticket eligible">T</span>}
+          {bet.early && <span title="Ticket eligible"><Ticket size={9} className="ml-0.5 text-bitcoin" /></span>}
         </span>
 
         {/* Amount */}
@@ -266,11 +272,16 @@ function BetRow({ bet, expanded, onToggle }: {
         </span>
 
         {/* Outcome */}
-        <span className={`text-xs w-16 shrink-0 text-right whitespace-nowrap ${
+        <span className={`inline-flex items-center justify-end gap-0.5 text-xs w-16 shrink-0 whitespace-nowrap ${
           !bet.resolved ? 'text-zinc-500' :
           bet.outcome === bet.side ? 'text-up' : 'text-down'
         }`}>
-          {!bet.resolved ? 'pending' : `${bet.outcome} ${bet.outcome === bet.side ? '\u2713' : '\u2717'}`}
+          {!bet.resolved
+            ? <><Clock size={10} className="text-zinc-500" /> pending</>
+            : bet.outcome === bet.side
+              ? <><CircleCheck size={10} /> Won</>
+              : <><CircleX size={10} /> Lost</>
+          }
         </span>
 
         {/* P&L */}

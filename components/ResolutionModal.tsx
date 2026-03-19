@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { CircleCheck, CircleX } from 'lucide-react'
 import { getPositionForRound, getPnl, saveMyResult } from '@/lib/positions'
 
 type Side = 'UP' | 'DOWN'
@@ -137,10 +138,11 @@ export function ResolutionModal({ round, onClose, jackpotBonus = 0 }: Resolution
               <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-xs text-zinc-500 uppercase tracking-wider">Result</p>
-                  <span className={`text-sm font-semibold ${
+                  <span className={`inline-flex items-center gap-1 text-sm font-semibold ${
                     won ? 'text-up' : 'text-down'
                   }`}>
-                    {won ? '✓ Won' : '✗ Lost'}
+                    {won ? <CircleCheck size={14} /> : <CircleX size={14} />}
+                    {won ? 'Won' : 'Lost'}
                   </span>
                 </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { getLocalStorage, isConnected, request } from '@stacks/connect'
 import { uintCV, contractPrincipalCV, stringAsciiCV } from '@stacks/transactions'
+import { CircleCheck, CircleX, RotateCcw, Ticket, AlertCircle } from 'lucide-react'
 import { TradeTape, type TradeTapeItem } from './TradeTape'
 import { BtcPrice } from './BtcPrice'
 import { Countdown } from './Countdown'
@@ -910,7 +911,7 @@ export function MarketCardV4() {
                   /* ── REFUND (no counterparty) ── */
                   <div className="absolute inset-0 flex items-center gap-2 px-3 bg-orange-500/[0.07] border border-orange-500/20 rounded-lg">
                     <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-orange-500" />
-                    <span className="text-sm shrink-0">↩</span>
+                    <RotateCcw size={14} className="text-orange-400 shrink-0" />
                     <span className="font-bold text-sm text-orange-400 shrink-0">Refunded</span>
                     <span className="text-xs text-orange-300/80 truncate">No counterparty — bets returned</span>
                     <div className="flex-1" />
@@ -932,9 +933,10 @@ export function MarketCardV4() {
                     }`}
                   >
                     <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${roundResult.won ? 'bg-up' : 'bg-down'}`} />
-                    <span className={`text-sm font-bold shrink-0 ${roundResult.won ? 'text-up' : 'text-down'}`}>
-                      {roundResult.won ? '✓' : '✗'}
-                    </span>
+                    {roundResult.won
+                      ? <CircleCheck size={14} className="text-up shrink-0" />
+                      : <CircleX size={14} className="text-down shrink-0" />
+                    }
                     <span className={`font-bold text-sm shrink-0 ${roundResult.won ? 'text-up' : 'text-down'}`}>
                       {roundResult.won ? 'Won' : 'Lost'}
                     </span>
@@ -944,8 +946,9 @@ export function MarketCardV4() {
                       </span>
                     )}
                     {roundResult.ticketsEarned > 0 && (
-                      <span className="font-mono text-sm font-bold text-yellow-400">
-                        +{roundResult.ticketsEarned} 🎟️
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-bitcoin/10 font-mono text-[11px] font-bold text-bitcoin shrink-0">
+                        <Ticket size={10} className="text-bitcoin" />
+                        +{roundResult.ticketsEarned}
                       </span>
                     )}
                     <div className="flex-1" />
@@ -965,7 +968,7 @@ export function MarketCardV4() {
                   /* ── ERROR ── */
                   <div className="absolute inset-0 flex items-center gap-2 px-3 bg-red-500/[0.07] border border-red-500/20 rounded-lg">
                     <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-red-500" />
-                    <span className="text-red-400 text-sm shrink-0">!</span>
+                    <AlertCircle size={14} className="text-red-400 shrink-0" />
                     <span className="flex-1 text-xs text-red-300 truncate">{error}</span>
                     <button
                       onClick={() => setError(null)}
@@ -1021,15 +1024,17 @@ export function MarketCardV4() {
                     )}
                     {!hasCounterparty && pool && pool.totalUp > 0 && pool.totalDown > 0 ? (
                       <span className="text-[10px] text-orange-400 font-bold truncate uppercase tracking-wider">
-                        No counterparty — Jackpot locked
+                        No counterparty — bets will be refunded
                       </span>
                     ) : earlySecsLeft > 0 ? (
-                      <span className="text-[10px] text-yellow-400/80 font-medium truncate">
-                        Predict more for bigger Jackpot share — {earlySecsLeft}s
+                      <span className="inline-flex items-center gap-1 text-[10px] text-bitcoin/80 font-medium truncate">
+                        <Ticket size={10} className="text-bitcoin shrink-0" />
+                        Earn more tickets — {earlySecsLeft}s
                       </span>
                     ) : isEarlyBet ? (
-                      <span className="px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 text-[9px] font-bold uppercase tracking-wider shrink-0">
-                        Jackpot
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-bitcoin/10 text-bitcoin text-[9px] font-bold uppercase tracking-wider shrink-0">
+                        <Ticket size={9} className="text-bitcoin" />
+                        Tickets earned
                       </span>
                     ) : null}
                     <div className="flex-1" />
@@ -1050,8 +1055,9 @@ export function MarketCardV4() {
                       <span className={`w-1.5 h-1.5 rounded-full ${earlySecsLeft > 0 && jackpot ? 'bg-yellow-400' : 'bg-up'}`} />
                     </div>
                     {earlySecsLeft > 0 && jackpot ? (
-                      <span className="text-sm text-yellow-200 font-bold flex-1 truncate">
-                        Predict now for Jackpot — {earlySecsLeft}s
+                      <span className="text-sm text-yellow-200 font-bold flex-1 truncate inline-flex items-center gap-1.5">
+                        <Ticket size={13} className="text-bitcoin shrink-0" />
+                        Earn tickets · {earlySecsLeft}s
                       </span>
                     ) : (
                       <span className="text-sm text-zinc-300 font-medium flex-1">Market open</span>
@@ -1072,7 +1078,7 @@ export function MarketCardV4() {
                       !hasCounterparty && pool && pool.totalUp > 0 && pool.totalDown > 0 ? 'bg-orange-400' : 'bg-amber-400'
                     }`} />
                     {!hasCounterparty && pool && pool.totalUp > 0 && pool.totalDown > 0 ? (
-                      <span className="text-sm text-orange-400 font-bold flex-1 truncate">No counterparty — Jackpot locked</span>
+                      <span className="text-sm text-orange-400 font-bold flex-1 truncate">No counterparty — bets will be refunded</span>
                     ) : (
                       <span className="text-sm text-amber-400/90 flex-1">Next round starting...</span>
                     )}

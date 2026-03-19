@@ -14,7 +14,7 @@ import { NETWORK_NAME, GATEWAY_CONTRACT, BITPREDIX_CONTRACT, splitContractId } f
 import { HIRO_API, hiroHeaders, disableApiKey } from '@/lib/hiro'
 import { alert } from '@/lib/alerting'
 import { dispatchWebhookEvent } from '@/lib/agent-webhooks'
-import { creditTicketsAfterSettlement } from '@/lib/jackpot'
+import { creditTicketsAfterSettlement, saveRoundTickets } from '@/lib/jackpot'
 import {
   getSponsorNonce,
   setSponsorNonce,
@@ -453,8 +453,11 @@ async function settleRound(
           user: eb.user, side: eb.side, amountUsd: eb.amountUsd,
           roundId: eb.roundId, betTimestampS: eb.betTimestampS, roundStartS: eb.roundStartS,
         }))
-        await creditTicketsAfterSettlement(roundId.toString(), betInfos)
-        clog({ action: 'jackpot-tickets', detail: `tickets credited: ${betInfos.length} early bets (${validity.uniqueWallets} wallets, UP=${validity.upBettors} DOWN=${validity.downBettors})` })
+        const ticketResults = await creditTicketsAfterSettlement(roundId.toString(), betInfos)
+        if (ticketResults.length > 0) {
+          await saveRoundTickets(roundId.toString(), ticketResults)
+        }
+        clog({ action: 'jackpot-tickets', detail: `tickets credited: ${betInfos.length} early bets → ${ticketResults.length} users, ${ticketResults.reduce((s, t) => s + t.tickets, 0)} total tickets (${validity.uniqueWallets} wallets, UP=${validity.upBettors} DOWN=${validity.downBettors})` })
       } else {
         clog({ action: 'jackpot-skip', detail: `no valid counterparty (${validity.uniqueWallets} unique wallets)` })
       }

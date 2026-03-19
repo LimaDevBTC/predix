@@ -1,6 +1,24 @@
 {
-  "name": "bitpredix",
+  "name": "predix",
   "version": "0.1.0",
+  "description": "Agent-native prediction market on Bitcoin. 1-minute BTC price rounds with zero gas fees, fully on-chain settlement on Stacks.",
+  "author": "Predix",
+  "license": "MIT",
+  "homepage": "https://www.predix.live",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prdx-live/predix.git"
+  },
+  "keywords": [
+    "prediction-market",
+    "bitcoin",
+    "stacks",
+    "defi",
+    "ai-agents",
+    "mcp",
+    "clarity",
+    "sponsored-transactions"
+  ],
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {

@@ -1,13 +1,17 @@
 {
-  "name": "@predix/mcp",
-  "version": "0.2.0",
+  "name": "@predixlive/mcp",
+  "version": "0.2.1",
   "description": "Predix Prediction Market - MCP Server for AI Agents",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "predix-mcp": "dist/index.js"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/prdx-live/predix"
@@ -21,7 +25,17 @@
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["predix", "prediction-market", "mcp", "model-context-protocol", "stacks", "bitcoin", "aibtc", "ai-agent", "defi"],
+  "keywords": [
+    "predix",
+    "prediction-market",
+    "mcp",
+    "model-context-protocol",
+    "stacks",
+    "bitcoin",
+    "aibtc",
+    "ai-agent",
+    "defi"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@stacks/transactions": "^7.0.0",

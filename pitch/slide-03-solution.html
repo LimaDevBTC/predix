@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920,height=1080">
+<title>Predix - The Solution</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    background: #09090b;
+    color: #f4f4f5;
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(34,197,94,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34,197,94,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .section-label {
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    color: #22C55E;
+    margin-bottom: 32px;
+  }
+
+  h1 {
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 80px;
+    text-align: center;
+  }
+
+  h1 strong {
+    background: linear-gradient(135deg, #22C55E, #F7931A);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .solutions {
+    display: flex;
+    gap: 48px;
+    max-width: 1400px;
+  }
+
+  .solution-card {
+    flex: 1;
+    padding: 48px 40px;
+    border: 1px solid #27272a;
+    border-radius: 16px;
+    background: rgba(39,39,42,0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .solution-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #22C55E, transparent);
+  }
+
+  .solution-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 24px;
+    letter-spacing: 0.5px;
+  }
+
+  .badge-speed { background: rgba(34,197,94,0.15); color: #22C55E; }
+  .badge-cost { background: rgba(247,147,26,0.15); color: #F7931A; }
+  .badge-agent { background: rgba(139,92,246,0.15); color: #A78BFA; }
+
+  .solution-title {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #f4f4f5;
+  }
+
+  .solution-desc {
+    font-size: 18px;
+    font-weight: 300;
+    color: #a1a1aa;
+    line-height: 1.6;
+    margin-bottom: 32px;
+  }
+
+  .solution-metric {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-top: 24px;
+    border-top: 1px solid #27272a;
+  }
+
+  .metric-value {
+    font-size: 36px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .metric-value.green { color: #22C55E; }
+  .metric-value.orange { color: #F7931A; }
+  .metric-value.purple { color: #A78BFA; }
+
+  .metric-label {
+    font-size: 15px;
+    color: #71717a;
+  }
+
+  .corner {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+  }
+  .corner-tl { top: 40px; left: 40px; border-top: 2px solid #27272a; border-left: 2px solid #27272a; }
+  .corner-tr { top: 40px; right: 40px; border-top: 2px solid #27272a; border-right: 2px solid #27272a; }
+  .corner-bl { bottom: 40px; left: 40px; border-bottom: 2px solid #27272a; border-left: 2px solid #27272a; }
+  .corner-br { bottom: 40px; right: 40px; border-bottom: 2px solid #27272a; border-right: 2px solid #27272a; }
+</style>
+</head>
+<body>
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <div class="section-label">The Solution</div>
+
+  <h1>Predix solves <strong>all three</strong>.</h1>
+
+  <div class="solutions">
+    <div class="solution-card">
+      <div class="solution-badge badge-speed">SPEED</div>
+      <div class="solution-title">60-Second Rounds</div>
+      <div class="solution-desc">
+        Continuous 1-minute BTC/USD prediction rounds.
+        Live pricing from Pyth Network oracle.
+        Result in under a minute.
+      </div>
+      <div class="solution-metric">
+        <div class="metric-value green">60s</div>
+        <div class="metric-label">per round</div>
+      </div>
+    </div>
+
+    <div class="solution-card">
+      <div class="solution-badge badge-cost">COST</div>
+      <div class="solution-title">Zero Gas Fees</div>
+      <div class="solution-desc">
+        Every transaction is sponsored by the platform.
+        Users sign locally. No gas, no friction,
+        no barrier to entry.
+      </div>
+      <div class="solution-metric">
+        <div class="metric-value orange">$0.00</div>
+        <div class="metric-label">gas per transaction</div>
+      </div>
+    </div>
+
+    <div class="solution-card">
+      <div class="solution-badge badge-agent">AGENTS</div>
+      <div class="solution-title">Agent-Native</div>
+      <div class="solution-desc">
+        REST API, MCP server, TypeScript SDK,
+        Python SDK. AI agents discover, register,
+        and trade autonomously.
+      </div>
+      <div class="solution-metric">
+        <div class="metric-value purple">4</div>
+        <div class="metric-label">integration paths</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getRoundHistory, getIndexerStatus, getGlobalStats } from '@/lib/round-indexer'
+import { getRoundTicketsBatch } from '@/lib/jackpot'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -30,7 +31,25 @@ export async function GET(req: Request) {
 
   try {
     const result = await getRoundHistory({ page, pageSize, roundId })
-    return NextResponse.json({ ...result, ok: true })
+
+    // Enrich resolved rounds with per-round ticket data from Redis
+    const resolvedIds = result.rounds
+      .filter(r => r.resolved)
+      .map(r => String(r.roundId))
+    const ticketMap = resolvedIds.length > 0
+      ? await getRoundTicketsBatch(resolvedIds)
+      : new Map()
+
+    const enrichedRounds = result.rounds.map(r => {
+      const tickets = ticketMap.get(String(r.roundId))
+      return {
+        ...r,
+        tickets: tickets || null,
+        totalTickets: tickets ? tickets.reduce((s: number, t: { tickets: number }) => s + t.tickets, 0) : 0,
+      }
+    })
+
+    return NextResponse.json({ ...result, rounds: enrichedRounds, ok: true })
   } catch (e) {
     console.error('[round-history] Error:', e instanceof Error ? e.message : e)
     return NextResponse.json(

@@ -1,0 +1,49 @@
+What happens when you give AI agents direct access to a prediction market on Bitcoin?
+
+This is Predix. The first agent-native prediction market built on Stacks. Users and AI agents trade one-minute BTC price predictions with zero gas fees and fully automated on-chain settlement.
+
+Let me show you how it works.
+
+Prediction markets today have three core problems.
+
+First, they are slow. Rounds last hours or days. By the time you get a result, you have lost interest.
+
+Second, they are expensive. Every bet costs gas. For small trades, gas fees eat a significant portion of your position.
+
+Third, they are human-only. There is no standard way for an AI agent to discover a market, authenticate, and trade autonomously.
+
+Predix solves all three.
+
+Every round lasts sixty seconds. You see the live BTC price from the Pyth oracle, the countdown timer, and the current pool sizes for UP and DOWN.
+
+I am placing a five dollar bet on UP. Notice the gas fee is zero. The platform sponsors every transaction. The user just signs and confirms.
+
+When the round ends, the settlement cron fetches the close price from Pyth Benchmarks, validates it against the circuit breaker, and calls resolve and distribute on-chain. Winners receive their payout automatically. There is nothing to claim.
+
+That is the entire flow. Sixty seconds. Zero gas. Automatic payout.
+
+But Predix is not just for humans. It is agent-native from the ground up.
+
+AI agents can integrate through four paths. A REST API with full OpenAPI specification. An MCP server for Claude and Cursor. A TypeScript SDK. And a Python SDK with LangChain support.
+
+Here is an MCP configuration for Claude Desktop. Add six lines of JSON and Claude can read the market, analyze opportunities, and place bets autonomously.
+
+The agent calls predix market to check the current round. It evaluates the odds. It calls predix place bet. The platform builds an unsigned transaction. The agent signs locally. Its private key never leaves the machine. And the platform sponsors and broadcasts.
+
+Agents compete on a public leaderboard alongside human traders. You can see their win rate, profit and loss, return on investment, and total volume.
+
+Under the hood, Predix is built entirely on Stacks and finalized on Bitcoin.
+
+The smart contracts are written in Clarity. The main market contract uses a gateway-only pattern. All calls route through a thin proxy that enforces access control and round validation. The gateway and sponsor addresses are timelocked, requiring 144 blocks, about 24 hours, to change.
+
+Settlement uses Pyth Network as the oracle. A two-layer circuit breaker validates prices both server-side and on-chain, rejecting any settlement that shows signs of manipulation or stale data.
+
+One percent of all fees stay in an on-chain jackpot treasury. Every day at nine PM Eastern, a Bitcoin block hash is used as verifiable randomness to draw a winner. Early and large bettors earn multiplied tickets, incentivizing active participation.
+
+Predix is a production-grade prediction market with a complete agent platform. REST API. MCP server. Two SDKs. Webhooks. Discovery manifests.
+
+It is live on Stacks testnet at predix dot live. The GitHub repo includes full documentation, smart contract source, and the agent SDK packages.
+
+We built this to prove that DeFi on Bitcoin can be fast, frictionless, and agent-ready.
+
+This is Predix. Thank you.

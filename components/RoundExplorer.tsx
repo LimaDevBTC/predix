@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { CircleCheck, CircleX, Ticket, Clock } from 'lucide-react'
 
 // ============================================================================
 // TYPES (mirrors lib/round-indexer.ts)
@@ -17,6 +18,14 @@ interface IndexedBet {
   early?: boolean
 }
 
+interface TicketResult {
+  user: string
+  tickets: number
+  multiplier: number
+  isFirst: boolean
+  isLargest: boolean
+}
+
 interface IndexedRound {
   roundId: number
   startTimestamp: number
@@ -30,6 +39,8 @@ interface IndexedRound {
   priceEnd: number | null
   bets: IndexedBet[]
   participantCount: number
+  tickets?: TicketResult[] | null
+  totalTickets?: number
 }
 
 // ============================================================================
@@ -436,6 +447,12 @@ function RoundRow({
             <span className="text-zinc-600 text-[10px]">
               {round.participantCount} predictor{round.participantCount !== 1 ? 's' : ''}
             </span>
+            {round.totalTickets != null && round.totalTickets > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-bitcoin/70 text-[10px]">
+                <Ticket size={8} />
+                {round.totalTickets}
+              </span>
+            )}
           </div>
         </div>
 
@@ -502,17 +519,33 @@ function RoundRow({
           </div>
 
           {/* Participants table */}
-          {round.bets.length > 0 && (
+          {round.bets.length > 0 && (() => {
+            const ticketMap = new Map<string, TicketResult>()
+            if (round.tickets) {
+              for (const t of round.tickets) ticketMap.set(t.user, t)
+            }
+            const hasTickets = ticketMap.size > 0
+
+            return (
             <div className="mt-2">
-              <div className="text-xs text-zinc-500 mb-2 font-medium">
-                Participants ({round.bets.length})
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-zinc-500 font-medium">
+                  Participants ({round.bets.length})
+                </span>
+                {round.totalTickets != null && round.totalTickets > 0 && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-bitcoin/10 text-bitcoin text-[10px] font-mono font-bold">
+                    <Ticket size={9} />
+                    {round.totalTickets.toLocaleString()} tickets
+                  </span>
+                )}
               </div>
               <div className="rounded-lg border border-zinc-800 overflow-hidden">
                 {/* Table header */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1.5 bg-zinc-800/50 text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
+                <div className={`grid ${hasTickets ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto]'} gap-2 px-3 py-1.5 bg-zinc-800/50 text-[10px] text-zinc-500 font-medium uppercase tracking-wider`}>
                   <span>Wallet</span>
                   <span className="text-right">Side</span>
                   <span className="text-right">Amount</span>
+                  {hasTickets && <span className="text-right">Tickets</span>}
                   <span className="text-right">Result</span>
                 </div>
                 {/* Rows */}
@@ -526,11 +559,12 @@ function RoundRow({
                     const isPending = bet.status === 'pending'
                     const won = !isPending && round.resolved && bet.side === round.outcome
                     const lost = !isPending && round.resolved && bet.side !== round.outcome
+                    const userTicket = ticketMap.get(bet.user)
 
                     return (
                       <div
                         key={bet.txId}
-                        className={`grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 border-t border-zinc-800/50 text-xs hover:bg-zinc-800/20 transition-colors ${isPending ? 'opacity-60' : ''}`}
+                        className={`grid ${hasTickets ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto]'} gap-2 px-3 py-2 border-t border-zinc-800/50 text-xs hover:bg-zinc-800/20 transition-colors ${isPending ? 'opacity-60' : ''}`}
                       >
                         {/* Wallet */}
                         <a
@@ -542,11 +576,11 @@ function RoundRow({
                         </a>
 
                         {/* Side */}
-                        <span className={`text-right font-medium ${
+                        <span className={`inline-flex items-center justify-end gap-0.5 font-medium ${
                           bet.side === 'UP' ? 'text-up' : 'text-down'
                         }`}>
                           {bet.side}
-                          {bet.early && <span className="ml-1 text-[9px] text-bitcoin/70" title="Early bet (ticket eligible)">T</span>}
+                          {bet.early && <span title="Early bet (ticket eligible)"><Ticket size={9} className="ml-0.5 text-bitcoin" /></span>}
                         </span>
 
                         {/* Amount */}
@@ -554,18 +588,42 @@ function RoundRow({
                           ${formatUsd(bet.amountUsd)}
                         </span>
 
+                        {/* Tickets */}
+                        {hasTickets && (
+                          <span className="text-right">
+                            {userTicket ? (
+                              <span className="inline-flex items-center justify-end gap-0.5 text-bitcoin font-mono">
+                                {userTicket.tickets}
+                                {userTicket.multiplier > 1 && (
+                                  <span className="text-[9px] text-bitcoin/60">{userTicket.multiplier}x</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600">—</span>
+                            )}
+                          </span>
+                        )}
+
                         {/* Result */}
-                        <span className={`text-right font-medium ${
+                        <span className={`inline-flex items-center justify-end gap-0.5 font-medium ${
                           isPending ? 'text-yellow-500' : won ? 'text-up' : lost ? 'text-down' : 'text-zinc-500'
                         }`}>
-                          {isPending ? 'Pending' : won ? 'Won' : lost ? 'Lost' : 'Pending'}
+                          {isPending
+                            ? <><Clock size={10} /> Pending</>
+                            : won
+                              ? <><CircleCheck size={10} /> Won</>
+                              : lost
+                                ? <><CircleX size={10} /> Lost</>
+                                : <><Clock size={10} /> Pending</>
+                          }
                         </span>
                       </div>
                     )
                   })}
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* Explorer link */}
           <div className="flex justify-end pt-1">

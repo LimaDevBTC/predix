@@ -60,6 +60,7 @@ const KEYS = {
   maxBet: (roundId: string, side: string) => `jackpot:max-bet:${roundId}:${side}`,
   draw: (day: string) => `jackpot:draw:${day}`,
   ticketUsers: (day: string) => `jackpot:ticket-users:${day}`,
+  roundTickets: (roundId: string) => `jackpot:round-tickets:${roundId}`,
 }
 
 // ---------------------------------------------------------------------------
@@ -298,6 +299,58 @@ export async function getTotalTickets(day?: string): Promise<number> {
   const d = day || dayId()
   const total = await redis.get(KEYS.ticketCount(d)) as number | null
   return total || 0
+}
+
+// ---------------------------------------------------------------------------
+// Per-round ticket persistence
+// ---------------------------------------------------------------------------
+
+/**
+ * Save ticket results for a round (called after creditTicketsAfterSettlement).
+ * Stored for 7 days — enough for round history browsing.
+ */
+export async function saveRoundTickets(roundId: string, results: TicketResult[]): Promise<void> {
+  const redis = getRedis()
+  if (!redis || results.length === 0) return
+  await redis.set(KEYS.roundTickets(roundId), JSON.stringify(results))
+  await redis.expire(KEYS.roundTickets(roundId), 7 * 24 * 3600)
+}
+
+/**
+ * Get ticket results for a specific round.
+ */
+export async function getRoundTickets(roundId: string): Promise<TicketResult[]> {
+  const redis = getRedis()
+  if (!redis) return []
+  const raw = await redis.get(KEYS.roundTickets(roundId))
+  if (!raw) return []
+  return typeof raw === 'string' ? JSON.parse(raw) : raw as unknown as TicketResult[]
+}
+
+/**
+ * Get ticket results for multiple rounds in a single batch.
+ */
+export async function getRoundTicketsBatch(roundIds: string[]): Promise<Map<string, TicketResult[]>> {
+  const redis = getRedis()
+  const result = new Map<string, TicketResult[]>()
+  if (!redis || roundIds.length === 0) return result
+
+  const pipeline = redis.pipeline()
+  for (const id of roundIds) {
+    pipeline.get(KEYS.roundTickets(id))
+  }
+  const responses = await pipeline.exec()
+
+  for (let i = 0; i < roundIds.length; i++) {
+    const raw = responses[i]
+    if (raw) {
+      const tickets = typeof raw === 'string' ? JSON.parse(raw) : raw as unknown as TicketResult[]
+      if (Array.isArray(tickets) && tickets.length > 0) {
+        result.set(roundIds[i], tickets)
+      }
+    }
+  }
+  return result
 }
 
 /**

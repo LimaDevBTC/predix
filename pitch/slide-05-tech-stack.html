@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920,height=1080">
+<title>Predix - Technical Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    background: #09090b;
+    color: #f4f4f5;
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(247,147,26,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(247,147,26,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .section-label {
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    color: #F7931A;
+    margin-bottom: 24px;
+  }
+
+  h1 {
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 64px;
+    text-align: center;
+  }
+
+  .arch-diagram {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    max-width: 1500px;
+  }
+
+  .arch-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .arch-box {
+    padding: 24px 32px;
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    background: rgba(39,39,42,0.4);
+    min-width: 220px;
+    text-align: center;
+  }
+
+  .arch-box-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #71717a;
+    margin-bottom: 8px;
+  }
+
+  .arch-box-value {
+    font-size: 18px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .arch-box.highlight {
+    border-color: #F7931A;
+    background: rgba(247,147,26,0.08);
+  }
+
+  .arch-box.green { border-color: rgba(34,197,94,0.4); }
+  .arch-box.purple { border-color: rgba(139,92,246,0.4); }
+  .arch-box.blue { border-color: rgba(59,130,246,0.4); }
+
+  .arch-box.green .arch-box-value { color: #22C55E; }
+  .arch-box.purple .arch-box-value { color: #A78BFA; }
+  .arch-box.blue .arch-box-value { color: #60A5FA; }
+  .arch-box.highlight .arch-box-value { color: #F7931A; }
+
+  .arch-arrow {
+    font-size: 32px;
+    color: #3f3f46;
+    flex-shrink: 0;
+  }
+
+  .arch-center {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .security-row {
+    display: flex;
+    gap: 24px;
+    margin-top: 64px;
+  }
+
+  .security-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    border: 1px solid #27272a;
+    border-radius: 100px;
+    font-size: 14px;
+    color: #a1a1aa;
+  }
+
+  .security-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22C55E;
+    flex-shrink: 0;
+  }
+
+  .corner {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+  }
+  .corner-tl { top: 40px; left: 40px; border-top: 2px solid #27272a; border-left: 2px solid #27272a; }
+  .corner-tr { top: 40px; right: 40px; border-top: 2px solid #27272a; border-right: 2px solid #27272a; }
+  .corner-bl { bottom: 40px; left: 40px; border-bottom: 2px solid #27272a; border-left: 2px solid #27272a; }
+  .corner-br { bottom: 40px; right: 40px; border-bottom: 2px solid #27272a; border-right: 2px solid #27272a; }
+</style>
+</head>
+<body>
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <div class="section-label">Architecture</div>
+  <h1>Fully on-chain. Finalized on Bitcoin.</h1>
+
+  <div class="arch-diagram">
+    <div class="arch-column">
+      <div class="arch-box green">
+        <div class="arch-box-title">Client</div>
+        <div class="arch-box-value">Browser / Xverse</div>
+      </div>
+      <div class="arch-box purple">
+        <div class="arch-box-title">Agent</div>
+        <div class="arch-box-value">SDK / MCP / API</div>
+      </div>
+    </div>
+
+    <div class="arch-arrow">&#8594;</div>
+
+    <div class="arch-center">
+      <div class="arch-box blue">
+        <div class="arch-box-title">Platform</div>
+        <div class="arch-box-value">Next.js + Vercel</div>
+      </div>
+      <div class="arch-box blue">
+        <div class="arch-box-title">Sponsor</div>
+        <div class="arch-box-value">/api/sponsor</div>
+      </div>
+      <div class="arch-box blue">
+        <div class="arch-box-title">State</div>
+        <div class="arch-box-value">Upstash Redis</div>
+      </div>
+    </div>
+
+    <div class="arch-arrow">&#8594;</div>
+
+    <div class="arch-column">
+      <div class="arch-box highlight">
+        <div class="arch-box-title">Gateway</div>
+        <div class="arch-box-value">gatewayv6.clar</div>
+      </div>
+      <div class="arch-box highlight">
+        <div class="arch-box-title">Market</div>
+        <div class="arch-box-value">predixv7.clar</div>
+      </div>
+      <div class="arch-box highlight">
+        <div class="arch-box-title">Token</div>
+        <div class="arch-box-value">test-usdcx</div>
+      </div>
+    </div>
+
+    <div class="arch-arrow">&#8594;</div>
+
+    <div class="arch-column">
+      <div class="arch-box" style="border-color: rgba(247,147,26,0.6); background: rgba(247,147,26,0.05);">
+        <div class="arch-box-title">Network</div>
+        <div class="arch-box-value" style="color: #F7931A;">Stacks Testnet</div>
+      </div>
+      <div class="arch-box" style="border-color: rgba(247,147,26,0.3);">
+        <div class="arch-box-title">Oracle</div>
+        <div class="arch-box-value" style="color: #F7931A;">Pyth Network</div>
+      </div>
+      <div class="arch-box" style="border-color: rgba(247,147,26,0.3);">
+        <div class="arch-box-title">Finality</div>
+        <div class="arch-box-value" style="color: #F7931A;">Bitcoin</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="security-row">
+    <div class="security-item">
+      <div class="security-dot"></div>
+      Gateway-only access
+    </div>
+    <div class="security-item">
+      <div class="security-dot"></div>
+      Timelocked upgrades (144 blocks)
+    </div>
+    <div class="security-item">
+      <div class="security-dot"></div>
+      Two-layer circuit breaker
+    </div>
+    <div class="security-item">
+      <div class="security-dot"></div>
+      Local signing only
+    </div>
+    <div class="security-item">
+      <div class="security-dot"></div>
+      Emergency pause + withdraw cap
+    </div>
+  </div>
+</body>
+</html>

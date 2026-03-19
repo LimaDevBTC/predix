@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920,height=1080">
+<title>Predix - The Problem</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    background: #09090b;
+    color: #f4f4f5;
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(239,68,68,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(239,68,68,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .section-label {
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    color: #EF4444;
+    margin-bottom: 32px;
+  }
+
+  h1 {
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 80px;
+    text-align: center;
+    color: #f4f4f5;
+  }
+
+  .problems {
+    display: flex;
+    gap: 48px;
+    max-width: 1400px;
+  }
+
+  .problem-card {
+    flex: 1;
+    padding: 48px 40px;
+    border: 1px solid #27272a;
+    border-radius: 16px;
+    background: rgba(39,39,42,0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .problem-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #EF4444, transparent);
+  }
+
+  .problem-number {
+    font-size: 64px;
+    font-weight: 800;
+    color: rgba(239,68,68,0.15);
+    font-family: 'JetBrains Mono', monospace;
+    position: absolute;
+    top: 16px;
+    right: 24px;
+  }
+
+  .problem-icon {
+    font-size: 40px;
+    margin-bottom: 24px;
+    display: block;
+    width: 64px;
+    height: 64px;
+    line-height: 64px;
+    text-align: center;
+    border-radius: 16px;
+    background: rgba(239,68,68,0.1);
+  }
+
+  .problem-title {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #f4f4f5;
+  }
+
+  .problem-desc {
+    font-size: 18px;
+    font-weight: 300;
+    color: #a1a1aa;
+    line-height: 1.6;
+  }
+
+  .problem-desc strong {
+    color: #EF4444;
+    font-weight: 500;
+  }
+
+  .corner {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+  }
+  .corner-tl { top: 40px; left: 40px; border-top: 2px solid #27272a; border-left: 2px solid #27272a; }
+  .corner-tr { top: 40px; right: 40px; border-top: 2px solid #27272a; border-right: 2px solid #27272a; }
+  .corner-bl { bottom: 40px; left: 40px; border-bottom: 2px solid #27272a; border-left: 2px solid #27272a; }
+  .corner-br { bottom: 40px; right: 40px; border-bottom: 2px solid #27272a; border-right: 2px solid #27272a; }
+</style>
+</head>
+<body>
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <div class="section-label">The Problem</div>
+
+  <h1>Prediction markets are broken.</h1>
+
+  <div class="problems">
+    <div class="problem-card">
+      <div class="problem-number">01</div>
+      <div class="problem-icon">&#9203;</div>
+      <div class="problem-title">Too Slow</div>
+      <div class="problem-desc">
+        Rounds last <strong>hours or days</strong>.
+        By the time you get a result,
+        you have already lost interest.
+      </div>
+    </div>
+
+    <div class="problem-card">
+      <div class="problem-number">02</div>
+      <div class="problem-icon">&#9981;</div>
+      <div class="problem-title">Too Expensive</div>
+      <div class="problem-desc">
+        Every bet costs <strong>gas</strong>.
+        For small trades, fees eat a
+        significant portion of your position.
+      </div>
+    </div>
+
+    <div class="problem-card">
+      <div class="problem-number">03</div>
+      <div class="problem-icon">&#9940;</div>
+      <div class="problem-title">Human-Only</div>
+      <div class="problem-desc">
+        No standard way for an <strong>AI agent</strong>
+        to discover a market, authenticate,
+        and trade autonomously.
+      </div>
+    </div>
+  </div>
+</body>
+</html>
