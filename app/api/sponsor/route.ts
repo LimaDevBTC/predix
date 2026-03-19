@@ -155,6 +155,16 @@ export async function POST(req: NextRequest) {
     const originAuth = (transaction.auth as any)?.spendingCondition ?? (transaction.auth as any)?.originCondition
     const originSignerHash = originAuth?.signer as string | undefined
 
+    // Convert hash160 signer to Stacks address for consistent tracking
+    let originAddress: string | undefined
+    if (originSignerHash) {
+      try {
+        const { c32address } = await import('c32check')
+        const version = NETWORK_NAME === 'mainnet' ? 22 : 26
+        originAddress = c32address(version, originSignerHash)
+      } catch { /* keep undefined */ }
+    }
+
     if (originSignerHash && !checkRateLimit(originSignerHash)) {
       return NextResponse.json(
         { error: 'Rate limit exceeded (max 10 txs/min)', reason: 'rate_limited' },
@@ -339,8 +349,8 @@ export async function POST(req: NextRequest) {
                 }).catch(() => {})
 
                 // Track wallet per side for counterparty validation
-                if (originSignerHash) {
-                  await trackBettorSide(roundId, originSignerHash.toLowerCase(), side as 'UP' | 'DOWN')
+                if (originAddress) {
+                  await trackBettorSide(roundId, originAddress, side as 'UP' | 'DOWN')
                 }
 
                 // Track early bet for jackpot (off-chain determination)
@@ -348,9 +358,9 @@ export async function POST(req: NextRequest) {
                 const roundStartMs = roundId * 60 * 1000
                 const betTimestampS = Math.floor(now / 1000)
                 const roundStartS = Math.floor(roundStartMs / 1000)
-                if (isEarlyBet(betTimestampS, roundStartS) && originSignerHash) {
+                if (isEarlyBet(betTimestampS, roundStartS) && originAddress) {
                   const earlyBetInfo = {
-                    user: originSignerHash.toLowerCase(),
+                    user: originAddress,
                     side: side as 'UP' | 'DOWN',
                     amountUsd: amountMicro / 1e6,
                     roundId: roundId.toString(),
