@@ -129,12 +129,23 @@ export default function JackpotPage() {
   const [address, setAddress] = useState<string | null>(null)
   const [countdownMs, setCountdownMs] = useState(0)
 
-  // Get wallet address
+  // Get wallet address (poll like MarketCard -- isConnected() may be false on first render)
   useEffect(() => {
-    if (!isConnected()) return
-    const data = getLocalStorage()
-    setAddress(data?.addresses?.stx?.[0]?.address ?? null)
-  }, [])
+    const refresh = () => {
+      if (typeof localStorage === 'undefined') return
+      if (!isConnected()) {
+        setAddress(null)
+        return
+      }
+      const data = getLocalStorage()
+      const addr = data?.addresses?.stx?.[0]?.address ?? null
+      if (addr !== address) setAddress(addr)
+    }
+    refresh()
+    const id = setInterval(refresh, 2500)
+    return () => clearInterval(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address])
 
   // Fetch data
   const fetchData = useCallback(async () => {
