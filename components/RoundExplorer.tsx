@@ -124,6 +124,7 @@ export function RoundExplorer({ initialRoundId }: { initialRoundId?: number }) {
   const [searchActive, setSearchActive] = useState(!!initialRoundId)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [stats, setStats] = useState<GlobalStats | null>(null)
+  const [jackpot, setJackpot] = useState<{ balance: number; totalTickets: number } | null>(null)
 
   // Fetch paginated rounds
   const fetchRounds = useCallback(async (pageNum: number, append: boolean) => {
@@ -195,11 +196,15 @@ export function RoundExplorer({ initialRoundId }: { initialRoundId?: number }) {
     }
   }, [fetchRounds, searchRound, initialRoundId])
 
-  // Fetch global stats
+  // Fetch global stats + jackpot
   useEffect(() => {
     fetch('/api/round-history?stats=global')
       .then(r => r.json())
       .then(data => { if (data.ok) setStats(data) })
+      .catch(() => {})
+    fetch('/api/jackpot/status')
+      .then(r => r.json())
+      .then(data => { if (data.ok) setJackpot({ balance: data.balance, totalTickets: data.totalTickets }) })
       .catch(() => {})
   }, [])
 
@@ -271,6 +276,28 @@ export function RoundExplorer({ initialRoundId }: { initialRoundId?: number }) {
           <GlobalStatCard label="Unique Traders" value={String(stats.uniqueWallets)} />
           <GlobalStatCard label="UP Win Rate" value={`${stats.resolvedRounds > 0 ? ((stats.upWins / stats.resolvedRounds) * 100).toFixed(0) : 0}%`} />
         </div>
+      )}
+
+      {/* Jackpot banner */}
+      {jackpot && (
+        <a
+          href="/jackpot"
+          className="flex items-center justify-between rounded-xl border border-bitcoin/20 bg-gradient-to-r from-bitcoin/[0.06] via-bitcoin/[0.03] to-transparent px-4 py-3 hover:from-bitcoin/[0.10] hover:via-bitcoin/[0.05] transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-bitcoin">Daily Jackpot</span>
+            <span className="text-zinc-400 text-xs font-mono">
+              Prize: <span className="text-zinc-200 font-bold">${(jackpot.balance * 0.10).toFixed(0)}</span>
+            </span>
+            <span className="hidden sm:inline text-zinc-500 text-xs">|</span>
+            <span className="hidden sm:inline text-zinc-400 text-xs font-mono">
+              Tickets today: <span className="text-zinc-200 font-bold">{jackpot.totalTickets}</span>
+            </span>
+          </div>
+          <span className="text-[10px] text-zinc-500 group-hover:text-bitcoin/60 transition-colors">
+            View &rarr;
+          </span>
+        </a>
       )}
 
       {/* Stats bar */}

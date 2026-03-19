@@ -316,20 +316,21 @@ export default function JackpotPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Pool Share</div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Win Chance</div>
                     <div className="text-2xl font-mono font-bold text-zinc-200 mt-0.5">
-                      {status.totalTickets > 0
+                      {status.totalTickets > 0 && status.userTickets > 0
                         ? `${((status.userTickets / status.totalTickets) * 100).toFixed(1)}%`
                         : '0%'}
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Est. Prize</div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Win Prize</div>
                     <div className="text-2xl font-mono font-bold text-bitcoin mt-0.5">
-                      {status.userProbability > 0
-                        ? `$${(prize * status.userProbability).toFixed(2)}`
+                      {status.userTickets > 0
+                        ? `$${prize.toFixed(0)}`
                         : '--'}
                     </div>
+                    <div className="text-[10px] text-zinc-600 mt-0.5">winner takes all</div>
                   </div>
                 </div>
 

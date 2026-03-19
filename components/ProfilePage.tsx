@@ -342,6 +342,25 @@ export default function ProfilePage({ address }: { address: string }) {
   const [activeFilter, setActiveFilter] = useState<Filter>('All')
   const [expandedBetIdx, setExpandedBetIdx] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
+  const [jackpot, setJackpot] = useState<{ balance: number; totalTickets: number; userTickets: number; countdownMs: number } | null>(null)
+
+  // Fetch jackpot status for this wallet
+  useEffect(() => {
+    let cancelled = false
+    const fetchJackpot = async () => {
+      try {
+        const res = await fetch(`/api/jackpot/status?address=${encodeURIComponent(address)}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled && data.ok) {
+          setJackpot({ balance: data.balance, totalTickets: data.totalTickets, userTickets: data.userTickets, countdownMs: data.countdownMs })
+        }
+      } catch { /* noop */ }
+    }
+    fetchJackpot()
+    const interval = setInterval(fetchJackpot, 30000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [address])
 
   const fetchProfile = useCallback(async (pageNum: number, append: boolean) => {
     if (append) setLoadingMore(true)
@@ -580,15 +599,50 @@ export default function ProfilePage({ address }: { address: string }) {
               </div>
             )}
 
-            {/* Jackpot link */}
+            {/* Jackpot card */}
             <a
               href="/jackpot"
-              className="flex items-center gap-3 rounded-xl border border-bitcoin/20 bg-bitcoin/[0.03] p-4 hover:bg-bitcoin/[0.06] transition-colors"
+              className="block rounded-xl border border-bitcoin/20 bg-gradient-to-r from-bitcoin/[0.06] via-bitcoin/[0.03] to-transparent p-4 sm:p-5 hover:from-bitcoin/[0.10] hover:via-bitcoin/[0.05] transition-all group"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/moneybag.png" alt="" className="w-5 h-5" />
-              <span className="text-sm font-medium text-bitcoin">View Jackpot</span>
-              <span className="text-zinc-600 text-xs ml-auto">Tickets, draws & treasury &rarr;</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/moneybag.png" alt="" className="w-5 h-5" />
+                  <span className="text-sm font-semibold text-bitcoin">Daily Jackpot</span>
+                </div>
+                <span className="text-[10px] text-zinc-500 group-hover:text-bitcoin/60 transition-colors flex items-center gap-0.5">
+                  View details &rarr;
+                </span>
+              </div>
+              {jackpot ? (
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Prize Pool</div>
+                    <div className="text-lg font-mono font-bold text-zinc-100 mt-0.5">
+                      ${(jackpot.balance * 0.10).toFixed(0)}
+                    </div>
+                    <div className="text-[10px] text-zinc-600">10% of ${jackpot.balance.toFixed(0)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Your Tickets</div>
+                    <div className="text-lg font-mono font-bold text-bitcoin mt-0.5">
+                      {jackpot.userTickets}
+                    </div>
+                    <div className="text-[10px] text-zinc-600">of {jackpot.totalTickets} total</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Win Chance</div>
+                    <div className="text-lg font-mono font-bold text-zinc-100 mt-0.5">
+                      {jackpot.totalTickets > 0 && jackpot.userTickets > 0
+                        ? `${((jackpot.userTickets / jackpot.totalTickets) * 100).toFixed(1)}%`
+                        : '--'}
+                    </div>
+                    <div className="text-[10px] text-zinc-600">winner takes all</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-12 animate-pulse bg-zinc-800/30 rounded-lg" />
+              )}
             </a>
 
             {/* Equity Curve */}
