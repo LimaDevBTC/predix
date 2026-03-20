@@ -55,11 +55,13 @@ async function getOnChainRound(roundId: number) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cv = deserializeCV(json.data) as any
     const tuple = (cv?.type === 'some' && cv?.value) ? cv.value : cv
-    const d = tuple?.data ?? cv?.data
+    // v7 @stacks/transactions: tuple fields are under .value, not .data
+    const d = tuple?.value ?? tuple?.data ?? cv?.value ?? cv?.data
     if (!d) return { roundId, up: 0, down: 0, resolved: false, priceStart: 0, priceEnd: 0, ts: Date.now() }
 
     const u = (k: string) => Number(d[k]?.value ?? 0)
-    const resolved = d['resolved']?.value === true || String(d['resolved']?.value) === 'true'
+    const resolvedField = d['resolved']
+    const resolved = resolvedField?.type === 'true' || resolvedField?.value === true || String(resolvedField?.value) === 'true'
     const result = { roundId, up: u('total-up'), down: u('total-down'), resolved, priceStart: u('price-start'), priceEnd: u('price-end'), ts: Date.now() }
     onChainCache = result
     return result

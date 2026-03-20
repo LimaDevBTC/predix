@@ -49,10 +49,12 @@ export async function GET(req: NextRequest) {
 
   if (res.ok && typeof json.data === 'string' && json.data.length > 0) {
     try {
-      const cv = deserializeCV(json.data) as { type?: string; value?: { data?: Record<string, unknown> }; data?: Record<string, unknown> }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cv = deserializeCV(json.data) as any
       out.cvType = cv?.type
       const tuple = cv?.type === 'some' && cv?.value ? cv.value : cv
-      const d = tuple?.data ?? cv?.data
+      // v7 @stacks/transactions: tuple fields are under .value, not .data
+      const d = tuple?.value ?? tuple?.data ?? cv?.value ?? cv?.data
       out.hasTupleData = !!d
       out.tupleKeys = d ? Object.keys(d) : []
       // Campos do contrato v5: total-up, total-down, price-start, price-end, resolved

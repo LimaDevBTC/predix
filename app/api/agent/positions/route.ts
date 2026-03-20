@@ -122,7 +122,8 @@ export const GET = (req: NextRequest) =>
             const cv = deserializeCV(json.data) as any
             if (cv?.type === 'none') return null
             const tuple = (cv?.type === 'some' && cv?.value) ? cv.value : cv
-            return tuple?.data ?? null
+            // v7 @stacks/transactions: tuple fields are under .value, not .data
+            return tuple?.value ?? tuple?.data ?? null
           }
 
           const [roundData, upBet, downBet] = await Promise.all([
@@ -131,7 +132,8 @@ export const GET = (req: NextRequest) =>
             fetchMap('bets', downKeyHex),
           ])
 
-          const resolved = roundData?.['resolved']?.value === true || String(roundData?.['resolved']?.value) === 'true'
+          const resolvedField = roundData?.['resolved']
+          const resolved = resolvedField?.type === 'true' || resolvedField?.value === true || String(resolvedField?.value) === 'true'
           const totalUp = Number(roundData?.['total-up']?.value ?? 0)
           const totalDown = Number(roundData?.['total-down']?.value ?? 0)
           const priceStart = Number(roundData?.['price-start']?.value ?? 0)
@@ -198,7 +200,8 @@ export const GET = (req: NextRequest) =>
         const cv = deserializeCV(json.data) as any
         if (cv?.type === 'none') return null
         const tuple = (cv?.type === 'some' && cv?.value) ? cv.value : cv
-        const d = tuple?.data
+        // v7 @stacks/transactions: tuple fields are under .value, not .data
+        const d = tuple?.value ?? tuple?.data
         const amount = Number(d?.['amount']?.value ?? 0)
         return amount > 0 ? { amount: amount / 1e6 } : null
       }
