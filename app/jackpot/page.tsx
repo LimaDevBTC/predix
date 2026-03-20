@@ -289,7 +289,7 @@ export default function JackpotPage() {
             {/* ============================================================ */}
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               <StatCard
-                label="Today's Pool"
+                label="Next Draw"
                 value={status ? status.totalTickets.toLocaleString() : '0'}
                 sub="tickets"
               />

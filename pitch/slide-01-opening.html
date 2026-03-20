@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=1920,height=1080">
 <title>Predix - Opening</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -14,7 +14,7 @@
     height: 1080px;
     background: #09090b;
     color: #f4f4f5;
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -23,66 +23,19 @@
     position: relative;
   }
 
-  /* Subtle grid background */
-  body::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(247,147,26,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(247,147,26,0.03) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
-  /* Top accent line */
-  body::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 400px;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #F7931A, transparent);
-  }
-
-  .logo-area {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    margin-bottom: 48px;
-  }
-
-  .logo-icon {
-    width: 80px;
+  .logo {
     height: 80px;
-    border-radius: 20px;
-    background: linear-gradient(135deg, #F7931A 0%, #E8850F 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 40px;
-    font-weight: 800;
-    color: #09090b;
-    letter-spacing: -2px;
-    box-shadow: 0 0 60px rgba(247,147,26,0.3);
-  }
-
-  .logo-text {
-    font-size: 72px;
-    font-weight: 700;
-    letter-spacing: -2px;
-    background: linear-gradient(135deg, #f4f4f5 0%, #a1a1aa 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    margin-bottom: 48px;
+    object-fit: contain;
+    clip-path: inset(10% 0);
   }
 
   .tagline {
-    font-size: 32px;
+    font-size: 36px;
     font-weight: 300;
     color: #a1a1aa;
-    letter-spacing: 0.5px;
-    margin-bottom: 64px;
+    letter-spacing: 0.3px;
+    margin-bottom: 72px;
     text-align: center;
     line-height: 1.4;
   }
@@ -94,114 +47,97 @@
 
   .stats-row {
     display: flex;
-    gap: 80px;
-    margin-bottom: 64px;
+    gap: 24px;
+    margin-bottom: 72px;
   }
 
-  .stat {
+  .stat-card {
     text-align: center;
+    padding: 32px 48px;
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    background: rgba(24,24,27,0.5);
+    min-width: 220px;
   }
 
   .stat-value {
     font-size: 48px;
     font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-    color: #f4f4f5;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
     margin-bottom: 8px;
   }
 
   .stat-value.green { color: #22C55E; }
   .stat-value.orange { color: #F7931A; }
+  .stat-value.white { color: #f4f4f5; }
 
   .stat-label {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 400;
     color: #71717a;
     text-transform: uppercase;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
   }
 
   .built-on {
     position: absolute;
-    bottom: 60px;
+    bottom: 56px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 18px;
-    color: #52525b;
+    gap: 16px;
+    font-size: 16px;
+    color: #71717a;
     font-weight: 400;
   }
 
-  .built-on span {
-    color: #71717a;
-    font-weight: 500;
-  }
-
-  .pill {
+  .badge {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
     padding: 8px 20px;
-    border: 1px solid #27272a;
-    border-radius: 100px;
+    border-radius: 12px;
     font-size: 14px;
-    color: #a1a1aa;
+    font-weight: 500;
+    background: rgba(247,147,26,0.1);
+    color: #F7931A;
+    border: 1px solid rgba(247,147,26,0.2);
     font-family: 'JetBrains Mono', monospace;
   }
 
-  .divider {
-    width: 1px;
-    height: 32px;
-    background: #27272a;
+  .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #3f3f46;
   }
-
-  /* Corner accents */
-  .corner {
-    position: absolute;
-    width: 40px;
-    height: 40px;
-  }
-  .corner-tl { top: 40px; left: 40px; border-top: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-tr { top: 40px; right: 40px; border-top: 2px solid #27272a; border-right: 2px solid #27272a; }
-  .corner-bl { bottom: 40px; left: 40px; border-bottom: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-br { bottom: 40px; right: 40px; border-bottom: 2px solid #27272a; border-right: 2px solid #27272a; }
 </style>
 </head>
 <body>
-  <div class="corner corner-tl"></div>
-  <div class="corner corner-tr"></div>
-  <div class="corner corner-bl"></div>
-  <div class="corner corner-br"></div>
-
-  <div class="logo-area">
-    <div class="logo-icon">Px</div>
-    <div class="logo-text">Predix</div>
-  </div>
+  <img src="../public/logo.png" alt="Predix" class="logo" />
 
   <div class="tagline">
     The first <strong>agent-native</strong> prediction market on Bitcoin.
   </div>
 
   <div class="stats-row">
-    <div class="stat">
-      <div class="stat-value">60s</div>
+    <div class="stat-card">
+      <div class="stat-value white">60s</div>
       <div class="stat-label">Round Duration</div>
     </div>
-    <div class="stat">
+    <div class="stat-card">
       <div class="stat-value green">$0</div>
       <div class="stat-label">Gas Fees</div>
     </div>
-    <div class="stat">
+    <div class="stat-card">
       <div class="stat-value orange">100%</div>
-      <div class="stat-label">On-Chain Settlement</div>
+      <div class="stat-label">On-Chain</div>
     </div>
   </div>
 
   <div class="built-on">
     <span>Built on</span>
-    <div class="pill">Stacks</div>
-    <div class="divider"></div>
-    <div class="pill">Finalized on Bitcoin</div>
+    <div class="badge">Stacks</div>
+    <div class="dot"></div>
+    <div class="badge">Finality on Bitcoin</div>
   </div>
 </body>
 </html>

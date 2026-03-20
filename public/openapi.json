@@ -6,8 +6,7 @@
     "version": "0.1.0"
   },
   "servers": [
-    { "url": "https://www.predix.live", "description": "Production" },
-    { "url": "https://bitpredix.vercel.app", "description": "Legacy (alias)" }
+    { "url": "https://www.predix.live", "description": "Production" }
   ],
   "paths": {
     "/api/agent/market": {

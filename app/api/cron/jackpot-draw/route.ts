@@ -13,7 +13,7 @@ import {
   resolveTicketOwner,
   calculatePrize,
   saveDrawResult,
-  todayET,
+  drawPeriodEndingET,
   type DrawResult,
 } from '@/lib/jackpot'
 import { NETWORK_NAME, GATEWAY_CONTRACT, splitContractId } from '@/lib/config'
@@ -40,8 +40,9 @@ export async function GET(req: Request) {
   }
 
   try {
-    // 1. Get today's date (ET timezone — consistent with ticket storage)
-    const today = todayET()
+    // 1. Get the draw period that's ending now (today's calendar date in ET).
+    // Tickets since last draw (21h yesterday → now) are stored under this date.
+    const today = drawPeriodEndingET()
     const now = new Date()
     const etDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
 

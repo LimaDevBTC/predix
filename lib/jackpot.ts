@@ -39,18 +39,45 @@ function getRedis(): Redis | null {
 // Keys (Redis -- tickets only, no balance)
 // ---------------------------------------------------------------------------
 /**
- * Get day ID in ET timezone (YYYY-MM-DD).
- * All jackpot operations use ET because the draw happens at 21h ET.
- * Tickets reset at midnight ET, not midnight UTC.
+ * Get the draw-period ID (YYYY-MM-DD) for a given timestamp.
+ *
+ * The draw happens at DRAW_HOUR ET (default 21h). Tickets earned AFTER the
+ * draw should count toward the NEXT draw (tomorrow). So the period boundary
+ * is at DRAW_HOUR ET, not midnight.
+ *
+ *   00:00–20:59 ET  →  today's date   (draw hasn't happened yet)
+ *   21:00–23:59 ET  →  tomorrow's date (draw already ran, tickets are for next draw)
  */
+const DRAW_HOUR = parseInt(process.env.JACKPOT_DRAW_HOUR || '21', 10)
+
 function dayId(date?: Date): string {
   const d = date || new Date()
-  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) // YYYY-MM-DD
+  // Get current ET time
+  const etStr = d.toLocaleString('en-US', { timeZone: 'America/New_York' })
+  const et = new Date(etStr)
+
+  // If past draw hour, roll forward to tomorrow's draw period
+  if (et.getHours() >= DRAW_HOUR) {
+    et.setDate(et.getDate() + 1)
+  }
+
+  // Return YYYY-MM-DD
+  return et.toLocaleDateString('en-CA') // YYYY-MM-DD
 }
 
-/** Public accessor for today's ET date string. */
+/** Public accessor for the current draw-period date string (for ticket accumulation). */
 export function todayET(): string {
   return dayId()
+}
+
+/**
+ * Get the draw-period date that is ENDING right now (for the draw cron).
+ * The draw at 21h ET should read tickets accumulated since the last draw,
+ * which are stored under today's calendar date.
+ */
+export function drawPeriodEndingET(): string {
+  const d = new Date()
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
 const KEYS = {
@@ -106,15 +133,16 @@ export async function recordEarlyBet(bet: BetInfo): Promise<void> {
   const maxKey = KEYS.maxBet(bet.roundId, bet.side)
 
   // Track first bettor (SETNX -- only sets if not exists)
+  // TTL 600s: must survive until cron settles (round end + broadcast + retries)
   await redis.setnx(firstKey, bet.user)
-  await redis.expire(firstKey, 120)
+  await redis.expire(firstKey, 600)
 
   // Track largest bet (compare and update)
   const currentMax = await redis.hgetall(maxKey) as { amount?: string; bettor?: string } | null
   const currentAmount = currentMax?.amount ? parseFloat(currentMax.amount) : 0
   if (bet.amountUsd > currentAmount) {
     await redis.hset(maxKey, { amount: bet.amountUsd.toString(), bettor: bet.user })
-    await redis.expire(maxKey, 120)
+    await redis.expire(maxKey, 600)
   }
 }
 
@@ -383,6 +411,7 @@ export async function getDrawResult(day: string): Promise<DrawResult | null> {
 
 /**
  * Get recent draw results (last N days).
+ * Draw results are keyed by calendar date (drawPeriodEndingET), not draw-period.
  */
 export async function getRecentDraws(count: number = 7): Promise<DrawResult[]> {
   const results: DrawResult[] = []
@@ -390,7 +419,9 @@ export async function getRecentDraws(count: number = 7): Promise<DrawResult[]> {
   for (let i = 0; i < count; i++) {
     const d = new Date(now)
     d.setDate(d.getDate() - i)
-    const result = await getDrawResult(dayId(d))
+    // Use calendar date in ET (not draw-period adjusted)
+    const calendarDay = d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+    const result = await getDrawResult(calendarDay)
     if (result) results.push(result)
   }
   return results

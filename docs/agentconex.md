@@ -426,7 +426,7 @@ Adicionar campos obrigatorios para npm publish:
   "files": ["dist", "README.md", "LICENSE"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/prdx-live/predix"
+    "url": "https://github.com/LimaDevBTC/predix"
   },
   "homepage": "https://www.predix.live/docs/agents",
   "license": "MIT",
@@ -562,7 +562,7 @@ Adicionar campos:
   "files": ["dist", "README.md", "LICENSE"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/prdx-live/predix"
+    "url": "https://github.com/LimaDevBTC/predix"
   },
   "homepage": "https://www.predix.live/docs/agents",
   "license": "MIT",
@@ -677,7 +677,7 @@ langchain = ["langchain-core>=0.1"]
 [project.urls]
 Homepage = "https://www.predix.live"
 Documentation = "https://www.predix.live/docs/agents"
-Repository = "https://github.com/prdx-live/predix"
+Repository = "https://github.com/LimaDevBTC/predix"
 
 [build-system]
 requires = ["hatchling"]

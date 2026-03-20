@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=1920,height=1080">
 <title>Predix - Agent Platform</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -14,20 +14,9 @@
     height: 1080px;
     background: #09090b;
     color: #f4f4f5;
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     display: flex;
     overflow: hidden;
-    position: relative;
-  }
-
-  body::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(139,92,246,0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(139,92,246,0.02) 1px, transparent 1px);
-    background-size: 60px 60px;
   }
 
   .left {
@@ -36,8 +25,6 @@
     flex-direction: column;
     justify-content: center;
     padding: 80px;
-    position: relative;
-    z-index: 1;
   }
 
   .right {
@@ -45,55 +32,61 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    z-index: 1;
+    padding: 80px;
   }
 
-  .section-label {
-    font-size: 14px;
+  .section-badge {
+    display: inline-flex;
+    padding: 8px 20px;
+    border-radius: 12px;
+    font-size: 13px;
     font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 4px;
+    background: rgba(168,139,250,0.1);
     color: #A78BFA;
-    margin-bottom: 24px;
+    border: 1px solid rgba(168,139,250,0.2);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 28px;
+    width: fit-content;
   }
 
   h1 {
-    font-size: 48px;
+    font-size: 44px;
     font-weight: 700;
     letter-spacing: -1px;
-    margin-bottom: 24px;
-    line-height: 1.1;
+    margin-bottom: 20px;
+    line-height: 1.15;
   }
 
   .subtitle {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 300;
     color: #a1a1aa;
     line-height: 1.6;
     margin-bottom: 48px;
-    max-width: 500px;
+    max-width: 480px;
   }
 
   .integrations {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    max-width: 500px;
+    gap: 12px;
+    max-width: 480px;
   }
 
   .integration {
-    padding: 20px 24px;
-    border: 1px solid #27272a;
+    padding: 16px 20px;
     border-radius: 12px;
-    background: rgba(39,39,42,0.4);
+    border: 1px solid #27272a;
+    background: rgba(24,24,27,0.5);
   }
 
   .integration-name {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     margin-bottom: 4px;
     font-family: 'JetBrains Mono', monospace;
+    color: #f4f4f5;
   }
 
   .integration-desc {
@@ -104,61 +97,57 @@
   .code-block {
     background: #18181b;
     border: 1px solid #27272a;
-    border-radius: 16px;
-    padding: 40px;
-    width: 720px;
+    border-radius: 12px;
+    padding: 32px;
+    width: 680px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 15px;
-    line-height: 1.8;
+    font-size: 14px;
+    line-height: 1.9;
     position: relative;
-    overflow: hidden;
   }
 
-  .code-block::before {
-    content: 'MCP Configuration';
+  .code-header {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    padding: 12px 24px;
+    padding: 10px 20px;
     font-size: 12px;
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 2px;
-    color: #A78BFA;
+    letter-spacing: 1.5px;
+    color: #71717a;
     background: rgba(39,39,42,0.5);
     border-bottom: 1px solid #27272a;
+    border-radius: 12px 12px 0 0;
     font-family: 'Outfit', sans-serif;
   }
 
+  .code-dots {
+    display: inline-flex;
+    gap: 6px;
+    margin-right: 12px;
+  }
+  .code-dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #3f3f46;
+  }
+
   .code-content {
-    margin-top: 32px;
+    margin-top: 28px;
   }
 
-  .code-block .brace { color: #71717a; }
-  .code-block .key { color: #A78BFA; }
-  .code-block .string { color: #22C55E; }
-  .code-block .comment { color: #52525b; font-style: italic; }
-
-  .corner {
-    position: absolute;
-    width: 40px;
-    height: 40px;
-  }
-  .corner-tl { top: 40px; left: 40px; border-top: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-tr { top: 40px; right: 40px; border-top: 2px solid #27272a; border-right: 2px solid #27272a; }
-  .corner-bl { bottom: 40px; left: 40px; border-bottom: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-br { bottom: 40px; right: 40px; border-bottom: 2px solid #27272a; border-right: 2px solid #27272a; }
+  .brace { color: #71717a; }
+  .key { color: #A78BFA; }
+  .string { color: #22C55E; }
+  .comment { color: #52525b; font-style: italic; }
 </style>
 </head>
 <body>
-  <div class="corner corner-tl"></div>
-  <div class="corner corner-tr"></div>
-  <div class="corner corner-bl"></div>
-  <div class="corner corner-br"></div>
-
   <div class="left">
-    <div class="section-label">Agent Platform</div>
+    <div class="section-badge">Agent Platform</div>
     <h1>Built for AI agents<br/>from day one.</h1>
     <div class="subtitle">
       Four integration paths. Local signing. Rate-limited API keys.
@@ -176,32 +165,35 @@
       </div>
       <div class="integration">
         <div class="integration-name">TypeScript SDK</div>
-        <div class="integration-desc">npm: @predix/sdk</div>
+        <div class="integration-desc">@predixlive/sdk</div>
       </div>
       <div class="integration">
         <div class="integration-name">Python SDK</div>
-        <div class="integration-desc">pip: predix-sdk</div>
+        <div class="integration-desc">predix-sdk</div>
       </div>
     </div>
   </div>
 
   <div class="right">
     <div class="code-block">
+      <div class="code-header">
+        <span class="code-dots"><span></span><span></span><span></span></span>
+        claude_desktop_config.json
+      </div>
       <div class="code-content">
         <span class="brace">{</span><br/>
         &nbsp;&nbsp;<span class="key">"mcpServers"</span>: <span class="brace">{</span><br/>
         &nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"predix"</span>: <span class="brace">{</span><br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"command"</span>: <span class="string">"npx"</span>,<br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"args"</span>: [<span class="string">"@predix/mcp"</span>],<br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"args"</span>: [<span class="string">"@predixlive/mcp"</span>],<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"env"</span>: <span class="brace">{</span><br/>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"PREDIX_API_KEY"</span>: <span class="string">"pk_live_..."</span>,<br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"STACKS_PRIVATE_KEY"</span>: <span class="string">"..."</span><br/>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="brace">}</span><br/>
         &nbsp;&nbsp;&nbsp;&nbsp;<span class="brace">}</span><br/>
         &nbsp;&nbsp;<span class="brace">}</span><br/>
         <span class="brace">}</span><br/>
         <br/>
-        <span class="comment">// 6 lines. Claude can now trade on Bitcoin.</span>
+        <span class="comment">// 5 lines. Claude can now trade on Bitcoin.</span>
       </div>
     </div>
   </div>

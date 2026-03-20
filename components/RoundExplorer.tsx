@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { CircleCheck, CircleX, Ticket, Clock } from 'lucide-react'
+import { Ticket, Clock } from 'lucide-react'
 
 // ============================================================================
 // TYPES (mirrors lib/round-indexer.ts)
@@ -77,8 +77,8 @@ function formatPrice(v: number): string {
 }
 
 function shortenAddress(addr: string): string {
-  if (addr.length <= 12) return addr
-  return addr.slice(0, 8) + '...' + addr.slice(-4)
+  if (addr.length <= 10) return addr.toLowerCase()
+  return (addr.slice(0, 4) + '\u2026' + addr.slice(-4)).toLowerCase()
 }
 
 // ============================================================================
@@ -97,9 +97,9 @@ function formatCompact(n: number): string {
 
 function GlobalStatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
+    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 overflow-hidden">
       <div className="text-[10px] text-zinc-500 uppercase tracking-wider">{label}</div>
-      <div className="text-sm font-mono text-zinc-200 mt-0.5">{value}</div>
+      <div className="text-sm font-mono text-zinc-200 mt-0.5 truncate">{value}</div>
     </div>
   )
 }
@@ -541,12 +541,12 @@ function RoundRow({
               </div>
               <div className="rounded-lg border border-zinc-800 overflow-hidden">
                 {/* Table header */}
-                <div className={`grid ${hasTickets ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto]'} gap-2 px-3 py-1.5 bg-zinc-800/50 text-[10px] text-zinc-500 font-medium uppercase tracking-wider`}>
-                  <span>Wallet</span>
-                  <span className="text-right">Side</span>
-                  <span className="text-right">Amount</span>
-                  {hasTickets && <span className="text-right">Tickets</span>}
-                  <span className="text-right">Result</span>
+                <div className={`flex px-2 sm:px-3 py-1.5 bg-zinc-800/50 text-[10px] text-zinc-500 font-medium uppercase tracking-wider`}>
+                  <span className="w-[28%] sm:w-[30%]">Wallet</span>
+                  <span className="w-[12%] text-center">Side</span>
+                  <span className="w-[22%] sm:w-[20%] text-right">Amt</span>
+                  {hasTickets && <span className="w-[12%] sm:w-[12%] text-right">Tkts</span>}
+                  <span className={`${hasTickets ? 'w-[26%] sm:w-[26%]' : 'w-[38%] sm:w-[38%]'} text-right`}>Result</span>
                 </div>
                 {/* Rows */}
                 {round.bets
@@ -564,58 +564,51 @@ function RoundRow({
                     return (
                       <div
                         key={bet.txId}
-                        className={`grid ${hasTickets ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto]'} gap-2 px-3 py-2 border-t border-zinc-800/50 text-xs hover:bg-zinc-800/20 transition-colors ${isPending ? 'opacity-60' : ''}`}
+                        className={`flex items-center px-2 sm:px-3 py-2 border-t border-zinc-800/50 text-xs hover:bg-zinc-800/20 transition-colors ${isPending ? 'opacity-60' : ''}`}
                       >
                         {/* Wallet */}
                         <a
                           href={`/profile/${bet.user}`}
-                          className="text-zinc-400 hover:text-zinc-200 transition-colors font-mono text-[11px] truncate"
+                          className="w-[28%] sm:w-[30%] text-zinc-400 hover:text-zinc-200 transition-colors font-mono text-[11px] truncate"
                           title={bet.user}
                         >
                           {shortenAddress(bet.user)}
                         </a>
 
                         {/* Side */}
-                        <span className={`inline-flex items-center justify-end gap-0.5 font-medium ${
+                        <span className={`w-[12%] text-center font-medium ${
                           bet.side === 'UP' ? 'text-up' : 'text-down'
                         }`}>
                           {bet.side}
-                          {bet.early && <span title="Early bet (ticket eligible)"><Ticket size={9} className="ml-0.5 text-bitcoin" /></span>}
                         </span>
 
                         {/* Amount */}
-                        <span className="text-right text-zinc-300">
+                        <span className="w-[22%] sm:w-[20%] text-right text-zinc-300 font-mono">
                           ${formatUsd(bet.amountUsd)}
                         </span>
 
                         {/* Tickets */}
                         {hasTickets && (
-                          <span className="text-right">
-                            {userTicket ? (
-                              <span className="inline-flex items-center justify-end gap-0.5 text-bitcoin font-mono">
-                                {userTicket.tickets}
-                                {userTicket.multiplier > 1 && (
-                                  <span className="text-[9px] text-bitcoin/60">{userTicket.multiplier}x</span>
-                                )}
-                              </span>
-                            ) : (
-                              <span className="text-zinc-600">—</span>
-                            )}
+                          <span className="w-[12%] text-right font-mono text-bitcoin">
+                            {userTicket ? userTicket.tickets : <span className="text-zinc-600">—</span>}
                           </span>
                         )}
 
                         {/* Result */}
-                        <span className={`inline-flex items-center justify-end gap-0.5 font-medium ${
+                        <span className={`${hasTickets ? 'w-[26%]' : 'w-[38%]'} text-right font-medium font-mono ${
                           isPending ? 'text-yellow-500' : won ? 'text-up' : lost ? 'text-down' : 'text-zinc-500'
                         }`}>
-                          {isPending
-                            ? <><Clock size={10} /> Pending</>
-                            : won
-                              ? <><CircleCheck size={10} /> Won</>
-                              : lost
-                                ? <><CircleX size={10} /> Lost</>
-                                : <><Clock size={10} /> Pending</>
-                          }
+                          {(() => {
+                            if (isPending) return <><Clock size={10} /> Pending</>
+                            if (won) {
+                              const winningPoolUsd = round.outcome === 'UP' ? round.totalUpUsd : round.totalDownUsd
+                              const payout = winningPoolUsd > 0 ? (bet.amountUsd / winningPoolUsd) * round.totalPoolUsd * 0.97 : 0
+                              const netProfit = payout - bet.amountUsd
+                              return <>+${formatUsd(netProfit)}</>
+                            }
+                            if (lost) return <>-${formatUsd(bet.amountUsd)}</>
+                            return <><Clock size={10} /> Pending</>
+                          })()}
                         </span>
                       </div>
                     )

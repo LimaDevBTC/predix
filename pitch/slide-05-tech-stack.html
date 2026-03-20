@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1920,height=1080">
-<title>Predix - Technical Architecture</title>
+<title>Predix - Architecture</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -14,232 +14,279 @@
     height: 1080px;
     background: #09090b;
     color: #f4f4f5;
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     overflow: hidden;
-    position: relative;
+    padding: 56px 80px;
   }
 
-  body::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(247,147,26,0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(247,147,26,0.02) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
-  .section-label {
-    font-size: 14px;
+  .section-badge {
+    display: inline-flex;
+    padding: 8px 20px;
+    border-radius: 12px;
+    font-size: 13px;
     font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 4px;
+    background: rgba(247,147,26,0.1);
     color: #F7931A;
-    margin-bottom: 24px;
+    border: 1px solid rgba(247,147,26,0.2);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
   }
 
   h1 {
-    font-size: 48px;
+    font-size: 44px;
     font-weight: 700;
     letter-spacing: -1px;
-    margin-bottom: 64px;
+    margin-bottom: 48px;
     text-align: center;
   }
 
-  .arch-diagram {
+  .arch {
     display: flex;
-    align-items: center;
-    gap: 32px;
-    max-width: 1500px;
+    align-items: stretch;
+    justify-content: center;
+    gap: 16px;
+    flex: 1;
+    width: 100%;
+    max-width: 1760px;
   }
 
-  .arch-column {
+  .col {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+    justify-content: center;
   }
 
-  .arch-box {
-    padding: 24px 32px;
-    border-radius: 12px;
-    border: 1px solid #27272a;
-    background: rgba(39,39,42,0.4);
-    min-width: 220px;
-    text-align: center;
-  }
-
-  .arch-box-title {
+  .col-label {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: #71717a;
+    text-align: center;
     margin-bottom: 8px;
+    font-weight: 500;
   }
 
-  .arch-box-value {
-    font-size: 18px;
+  .box {
+    padding: 18px 24px;
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    background: rgba(24,24,27,0.5);
+    min-width: 190px;
+  }
+
+  .box-title {
+    font-size: 15px;
     font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .box-sub {
+    font-size: 12px;
     font-family: 'JetBrains Mono', monospace;
+    color: #71717a;
   }
 
-  .arch-box.highlight {
-    border-color: #F7931A;
-    background: rgba(247,147,26,0.08);
+  .box-detail {
+    font-size: 11px;
+    color: #52525b;
+    margin-top: 6px;
   }
 
-  .arch-box.green { border-color: rgba(34,197,94,0.4); }
-  .arch-box.purple { border-color: rgba(139,92,246,0.4); }
-  .arch-box.blue { border-color: rgba(59,130,246,0.4); }
+  .col-client .col-label { color: #22C55E; }
+  .col-client .box { border-color: rgba(34,197,94,0.2); }
+  .col-client .box-title { color: #22C55E; }
 
-  .arch-box.green .arch-box-value { color: #22C55E; }
-  .arch-box.purple .arch-box-value { color: #A78BFA; }
-  .arch-box.blue .arch-box-value { color: #60A5FA; }
-  .arch-box.highlight .arch-box-value { color: #F7931A; }
+  .col-platform .col-label { color: #60A5FA; }
+  .col-platform .box { border-color: rgba(59,130,246,0.2); }
+  .col-platform .box-title { color: #60A5FA; }
 
-  .arch-arrow {
-    font-size: 32px;
-    color: #3f3f46;
-    flex-shrink: 0;
-  }
+  .col-state .col-label { color: #A78BFA; }
+  .col-state .box { border-color: rgba(168,139,250,0.2); }
+  .col-state .box-title { color: #A78BFA; }
 
-  .arch-center {
+  .col-chain .col-label { color: #F7931A; }
+  .col-chain .box { border-color: rgba(247,147,26,0.2); }
+  .col-chain .box-title { color: #F7931A; }
+
+  .col-oracle .col-label { color: #EC4899; }
+  .col-oracle .box { border-color: rgba(236,72,153,0.2); }
+  .col-oracle .box-title { color: #EC4899; }
+
+  .arrow-col {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    justify-content: center;
     align-items: center;
+    width: 40px;
+    flex-shrink: 0;
+    color: #3f3f46;
+    font-size: 24px;
   }
 
   .security-row {
     display: flex;
-    gap: 24px;
-    margin-top: 64px;
+    gap: 16px;
+    margin-top: 32px;
+    flex-shrink: 0;
   }
 
-  .security-item {
+  .security-badge {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 24px;
-    border: 1px solid #27272a;
-    border-radius: 100px;
-    font-size: 14px;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 13px;
     color: #a1a1aa;
+    background: rgba(24,24,27,0.5);
+    border: 1px solid #27272a;
   }
 
   .security-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: #22C55E;
     flex-shrink: 0;
   }
-
-  .corner {
-    position: absolute;
-    width: 40px;
-    height: 40px;
-  }
-  .corner-tl { top: 40px; left: 40px; border-top: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-tr { top: 40px; right: 40px; border-top: 2px solid #27272a; border-right: 2px solid #27272a; }
-  .corner-bl { bottom: 40px; left: 40px; border-bottom: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-br { bottom: 40px; right: 40px; border-bottom: 2px solid #27272a; border-right: 2px solid #27272a; }
 </style>
 </head>
 <body>
-  <div class="corner corner-tl"></div>
-  <div class="corner corner-tr"></div>
-  <div class="corner corner-bl"></div>
-  <div class="corner corner-br"></div>
+  <div class="section-badge">Architecture</div>
+  <h1>Fully on-chain. Finality on Bitcoin.</h1>
 
-  <div class="section-label">Architecture</div>
-  <h1>Fully on-chain. Finalized on Bitcoin.</h1>
-
-  <div class="arch-diagram">
-    <div class="arch-column">
-      <div class="arch-box green">
-        <div class="arch-box-title">Client</div>
-        <div class="arch-box-value">Browser / Xverse</div>
+  <div class="arch">
+    <div class="col col-client">
+      <div class="col-label">Clients</div>
+      <div class="box">
+        <div class="box-title">Browser</div>
+        <div class="box-sub">Xverse Wallet</div>
+        <div class="box-detail">Sign locally, zero gas</div>
       </div>
-      <div class="arch-box purple">
-        <div class="arch-box-title">Agent</div>
-        <div class="arch-box-value">SDK / MCP / API</div>
+      <div class="box">
+        <div class="box-title">AI Agent</div>
+        <div class="box-sub">SDK / MCP / REST</div>
+        <div class="box-detail">Autonomous trading</div>
+      </div>
+      <div class="box">
+        <div class="box-title">Webhooks</div>
+        <div class="box-sub">HMAC-signed</div>
+        <div class="box-detail">6 event types</div>
       </div>
     </div>
 
-    <div class="arch-arrow">&#8594;</div>
+    <div class="arrow-col">&rarr;</div>
 
-    <div class="arch-center">
-      <div class="arch-box blue">
-        <div class="arch-box-title">Platform</div>
-        <div class="arch-box-value">Next.js + Vercel</div>
+    <div class="col col-platform">
+      <div class="col-label">Platform</div>
+      <div class="box">
+        <div class="box-title">/api/sponsor</div>
+        <div class="box-sub">Validate + Sponsor</div>
+        <div class="box-detail">Add gas, broadcast</div>
       </div>
-      <div class="arch-box blue">
-        <div class="arch-box-title">Sponsor</div>
-        <div class="arch-box-value">/api/sponsor</div>
+      <div class="box">
+        <div class="box-title">/api/agent/*</div>
+        <div class="box-sub">10 endpoints</div>
+        <div class="box-detail">Market, trade, portfolio</div>
       </div>
-      <div class="arch-box blue">
-        <div class="arch-box-title">State</div>
-        <div class="arch-box-value">Upstash Redis</div>
+      <div class="box">
+        <div class="box-title">/api/cron/*</div>
+        <div class="box-sub">Settlement + Jackpot</div>
+        <div class="box-detail">Every 60s + daily 21h</div>
+      </div>
+      <div class="box">
+        <div class="box-title">@predixlive/mcp</div>
+        <div class="box-sub">7 tools, 2 resources</div>
+        <div class="box-detail">Claude, Cursor, Windsurf</div>
       </div>
     </div>
 
-    <div class="arch-arrow">&#8594;</div>
+    <div class="arrow-col">&harr;</div>
 
-    <div class="arch-column">
-      <div class="arch-box highlight">
-        <div class="arch-box-title">Gateway</div>
-        <div class="arch-box-value">gatewayv6.clar</div>
+    <div class="col col-state">
+      <div class="col-label">State</div>
+      <div class="box">
+        <div class="box-title">Upstash Redis</div>
+        <div class="box-sub">Optimistic pools</div>
+        <div class="box-detail">Nonces, tickets, keys</div>
       </div>
-      <div class="arch-box highlight">
-        <div class="arch-box-title">Market</div>
-        <div class="arch-box-value">predixv7.clar</div>
-      </div>
-      <div class="arch-box highlight">
-        <div class="arch-box-title">Token</div>
-        <div class="arch-box-value">test-usdcx</div>
+      <div class="box">
+        <div class="box-title">Merge Strategy</div>
+        <div class="box-sub">max(chain, redis)</div>
+        <div class="box-detail">Instant UX, eventual truth</div>
       </div>
     </div>
 
-    <div class="arch-arrow">&#8594;</div>
+    <div class="arrow-col">&rarr;</div>
 
-    <div class="arch-column">
-      <div class="arch-box" style="border-color: rgba(247,147,26,0.6); background: rgba(247,147,26,0.05);">
-        <div class="arch-box-title">Network</div>
-        <div class="arch-box-value" style="color: #F7931A;">Stacks Testnet</div>
+    <div class="col col-chain">
+      <div class="col-label">Blockchain</div>
+      <div class="box">
+        <div class="box-title">gatewayv6</div>
+        <div class="box-sub">Thin proxy</div>
+        <div class="box-detail">Access control, pause</div>
       </div>
-      <div class="arch-box" style="border-color: rgba(247,147,26,0.3);">
-        <div class="arch-box-title">Oracle</div>
-        <div class="arch-box-value" style="color: #F7931A;">Pyth Network</div>
+      <div class="box">
+        <div class="box-title">predixv7</div>
+        <div class="box-sub">Market + Jackpot</div>
+        <div class="box-detail">Resolve, distribute, fees</div>
       </div>
-      <div class="arch-box" style="border-color: rgba(247,147,26,0.3);">
-        <div class="arch-box-title">Finality</div>
-        <div class="arch-box-value" style="color: #F7931A;">Bitcoin</div>
+      <div class="box">
+        <div class="box-title">test-usdcx</div>
+        <div class="box-sub">SIP-010 token</div>
+        <div class="box-detail">6 decimals, 1k mint</div>
+      </div>
+      <div class="box">
+        <div class="box-title">Stacks Testnet</div>
+        <div class="box-sub">~10s blocks</div>
+        <div class="box-detail">Finality on Bitcoin</div>
+      </div>
+    </div>
+
+    <div class="arrow-col">&larr;</div>
+
+    <div class="col col-oracle">
+      <div class="col-label">Oracle</div>
+      <div class="box">
+        <div class="box-title">Pyth Hermes</div>
+        <div class="box-sub">SSE stream</div>
+        <div class="box-detail">Live BTC/USD price</div>
+      </div>
+      <div class="box">
+        <div class="box-title">Pyth Benchmarks</div>
+        <div class="box-sub">REST API</div>
+        <div class="box-detail">Settlement price</div>
+      </div>
+      <div class="box">
+        <div class="box-title">Circuit Breaker</div>
+        <div class="box-sub">2-layer validation</div>
+        <div class="box-detail">0.3% + 0.5% + 1%</div>
       </div>
     </div>
   </div>
 
   <div class="security-row">
-    <div class="security-item">
+    <div class="security-badge">
       <div class="security-dot"></div>
       Gateway-only access
     </div>
-    <div class="security-item">
+    <div class="security-badge">
       <div class="security-dot"></div>
       Timelocked upgrades (144 blocks)
     </div>
-    <div class="security-item">
+    <div class="security-badge">
       <div class="security-dot"></div>
       Two-layer circuit breaker
     </div>
-    <div class="security-item">
+    <div class="security-badge">
       <div class="security-dot"></div>
       Local signing only
     </div>
-    <div class="security-item">
+    <div class="security-badge">
       <div class="security-dot"></div>
       Emergency pause + withdraw cap
     </div>

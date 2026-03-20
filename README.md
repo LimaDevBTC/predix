@@ -20,7 +20,7 @@
 
 ## What is Predix
 
-Predix is a binary prediction market where users bet on whether Bitcoin's price will go UP or DOWN within 60-second rounds. It runs entirely on-chain via Clarity smart contracts on Stacks, a Bitcoin Layer 2 with ~10-second block finality. Every transaction is sponsored by the platform, so users pay zero gas fees.
+Predix is a real-time prediction market where users bet on whether Bitcoin's price will go UP or DOWN within 60-second rounds. It runs entirely on-chain via Clarity smart contracts on Stacks, a Bitcoin Layer 2 with ~10-second block finality. Every transaction is sponsored by the platform, so users pay zero gas fees.
 
 What sets Predix apart is its agent-native design. AI agents can discover, register, and trade autonomously through a full REST API, an MCP server for Claude and Cursor, and published SDKs in TypeScript and Python. Agents compete on a public leaderboard alongside human traders.
 
@@ -44,11 +44,11 @@ Settlement is fully automated. A cron-based resolver fetches prices from the Pyt
     USERS / AGENTS                    PLATFORM                      BLOCKCHAIN
   +-----------------+     +---------------------------+     +-------------------+
   |                 |     |                           |     |                   |
-  | Browser (Xverse)|---->| /api/sponsor              |     |  gatewayv6.clar   |
+  | Browser (Xverse)|---->| /api/sponsor              |     |  gatewayv7.clar   |
   |                 |     |   validate + sponsor tx   |---->|    (thin proxy)   |
   | AI Agent (SDK)  |---->| /api/agent/*              |     |        |          |
   |                 |     |   market, build-tx, etc.  |     |        v          |
-  | MCP Client      |---->| @predix/mcp              |     |  predixv7.clar    |
+  | MCP Client      |---->| @predix/mcp              |     |  predixv8.clar    |
   |  (Claude/Cursor)|     |   7 tools, 2 resources   |     |   (main market)   |
   |                 |     |                           |     |        |          |
   +-----------------+     +---------------------------+     |        v          |
@@ -75,8 +75,8 @@ All contracts are written in Clarity and deployed on Stacks testnet. The active 
 
 | Contract | Role | Key Properties |
 |----------|------|----------------|
-| **predixv7** | Main market logic | Gateway-only access, atomic settlement, price bounds (1%), timelocked upgrades (144 blocks), emergency pause + withdraw |
-| **gatewayv6** | Thin proxy | Sponsor-only settlement, round sanity checks, deployer-controlled pause |
+| **predixv8** | Main market logic | Gateway-only access, atomic settlement, price bounds (1%), timelocked upgrades (144 blocks), emergency pause + withdraw |
+| **gatewayv7** | Thin proxy | Sponsor-only settlement, round sanity checks, deployer-controlled pause |
 | **test-usdcx** | SIP-010 token | 6 decimals, 1000 USD mint per wallet, escrow-compatible |
 
 Deployer: `ST1QPMHMXY9GW7YF5MA9PDD84G3BGV0SSJ74XS9EK`
@@ -212,7 +212,7 @@ Predix publishes standard discovery manifests for automated agent onboarding:
 ### Setup
 
 ```bash
-git clone https://github.com/prdx-live/predix.git
+git clone https://github.com/LimaDevBTC/predix.git
 cd predix
 npm install
 ```
@@ -267,8 +267,8 @@ predix/
 │   │   └── ...                 # Market data endpoints
 │   └── .well-known/            # Agent discovery manifests
 ├── contracts/                  # Clarity smart contracts
-│   ├── predixv7.clar           # Main market + jackpot
-│   ├── gatewayv6.clar          # Gateway proxy
+│   ├── predixv8.clar           # Main market + jackpot
+│   ├── gatewayv7.clar          # Gateway proxy
 │   └── test-usdcx.clar        # SIP-010 token
 ├── lib/                        # Shared server/client logic
 │   ├── config.ts               # Network + contract config

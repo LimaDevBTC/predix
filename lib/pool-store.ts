@@ -401,7 +401,7 @@ export async function pushEarlyBet(roundId: number, entry: EarlyBetEntry): Promi
   try {
     const key = `early-bets:${roundId}`
     await kv.rpush(key, JSON.stringify(entry))
-    await kv.expire(key, 300)
+    await kv.expire(key, 600)
   } catch (err) {
     console.warn('[pool-store] pushEarlyBet failed (non-fatal):', (err as Error).message)
   }
@@ -483,7 +483,7 @@ export async function trackBettorSide(
     const key = side === 'UP' ? `bu:${roundId}` : `bd:${roundId}`
     const pipe = kv.pipeline()
     pipe.sadd(key, walletHash)
-    pipe.expire(key, 300)
+    pipe.expire(key, 600)
     await pipe.exec()
     // Invalidate coalescing cache
     _bettorCache = null

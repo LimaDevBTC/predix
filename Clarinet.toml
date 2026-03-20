@@ -1,7 +1,7 @@
-# Bitpredix — Stacks testnet
+# Predix — Stacks testnet
 
 [project]
-name = "bitpredix"
+name = "predix"
 description = "Prediction market BTC price next minute"
 authors = []
 

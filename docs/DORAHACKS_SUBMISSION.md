@@ -20,7 +20,7 @@ AI agents and humans trade 1-minute BTC price predictions on Stacks with zero ga
 
 ## Project Description
 
-Predix is a binary prediction market where users bet on whether Bitcoin's price will go up or down within 60-second rounds. Every round is settled fully on-chain through Clarity smart contracts on Stacks, with payouts distributed atomically to winners. Users pay zero gas fees -- every transaction is sponsored by the platform.
+Predix is a real-time prediction market where users bet on whether Bitcoin's price will go up or down within 60-second rounds. Every round is settled fully on-chain through Clarity smart contracts on Stacks, with payouts distributed atomically to winners. Users pay zero gas fees -- every transaction is sponsored by the platform.
 
 ### The Problem
 
@@ -95,7 +95,7 @@ Predix leverages the full Stacks technology stack:
 | Resource | URL |
 |----------|-----|
 | Live Demo | https://www.predix.live |
-| GitHub Repo | https://github.com/prdx-live/predix |
+| GitHub Repo | https://github.com/LimaDevBTC/predix |
 | Agent Documentation | https://www.predix.live/docs/agents |
 | Agent Leaderboard | https://www.predix.live/agents |
 | OpenAPI Specification | https://www.predix.live/openapi.json |

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=1920,height=1080">
 <title>Predix - Closing</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -14,113 +14,44 @@
     height: 1080px;
     background: #09090b;
     color: #f4f4f5;
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    position: relative;
   }
 
-  body::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse 800px 600px at 50% 40%, rgba(247,147,26,0.06) 0%, transparent 100%);
-  }
-
-  body::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 400px;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #F7931A, transparent);
-  }
-
-  .logo-area {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    margin-bottom: 40px;
-  }
-
-  .logo-icon {
-    width: 72px;
+  .logo {
     height: 72px;
-    border-radius: 18px;
-    background: linear-gradient(135deg, #F7931A 0%, #E8850F 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 36px;
-    font-weight: 800;
-    color: #09090b;
-    letter-spacing: -2px;
-    box-shadow: 0 0 80px rgba(247,147,26,0.25);
-  }
-
-  .logo-text {
-    font-size: 64px;
-    font-weight: 700;
-    letter-spacing: -2px;
-    background: linear-gradient(135deg, #f4f4f5 0%, #a1a1aa 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    margin-bottom: 40px;
+    object-fit: contain;
+    clip-path: inset(10% 0);
   }
 
   .closing-text {
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 300;
     color: #a1a1aa;
     text-align: center;
     line-height: 1.5;
     max-width: 700px;
-    margin-bottom: 64px;
-  }
-
-  .links {
-    display: flex;
-    gap: 32px;
-    margin-bottom: 48px;
-  }
-
-  .link-card {
-    padding: 24px 40px;
-    border: 1px solid #27272a;
-    border-radius: 12px;
-    background: rgba(39,39,42,0.3);
-    text-align: center;
-    min-width: 240px;
-  }
-
-  .link-label {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: #71717a;
-    margin-bottom: 8px;
-  }
-
-  .link-url {
-    font-size: 18px;
-    font-weight: 500;
-    font-family: 'JetBrains Mono', monospace;
-    color: #F7931A;
+    margin-bottom: 56px;
   }
 
   .features-row {
     display: flex;
-    gap: 48px;
-    margin-bottom: 48px;
+    gap: 40px;
+    margin-bottom: 56px;
   }
 
   .feature {
     text-align: center;
+    padding: 24px 32px;
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    background: rgba(24,24,27,0.5);
+    min-width: 140px;
   }
 
   .feature-value {
@@ -132,41 +63,53 @@
   }
 
   .feature-label {
-    font-size: 13px;
+    font-size: 12px;
     color: #71717a;
     text-transform: uppercase;
     letter-spacing: 1.5px;
   }
 
-  .thank-you {
-    position: absolute;
-    bottom: 48px;
-    font-size: 16px;
-    color: #52525b;
-    font-weight: 400;
+  .links {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 48px;
   }
 
-  .corner {
-    position: absolute;
-    width: 40px;
-    height: 40px;
+  .link-card {
+    padding: 20px 36px;
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    background: rgba(24,24,27,0.5);
+    text-align: center;
+    min-width: 240px;
   }
-  .corner-tl { top: 40px; left: 40px; border-top: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-tr { top: 40px; right: 40px; border-top: 2px solid #27272a; border-right: 2px solid #27272a; }
-  .corner-bl { bottom: 40px; left: 40px; border-bottom: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-br { bottom: 40px; right: 40px; border-bottom: 2px solid #27272a; border-right: 2px solid #27272a; }
+
+  .link-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #71717a;
+    margin-bottom: 6px;
+  }
+
+  .link-url {
+    font-size: 17px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    color: #F7931A;
+  }
+
+  .footer {
+    position: absolute;
+    bottom: 48px;
+    font-size: 14px;
+    color: #3f3f46;
+    font-weight: 400;
+  }
 </style>
 </head>
 <body>
-  <div class="corner corner-tl"></div>
-  <div class="corner corner-tr"></div>
-  <div class="corner corner-bl"></div>
-  <div class="corner corner-br"></div>
-
-  <div class="logo-area">
-    <div class="logo-icon">Px</div>
-    <div class="logo-text">Predix</div>
-  </div>
+  <img src="../public/logo.png" alt="Predix" class="logo" />
 
   <div class="closing-text">
     A production-grade prediction market with a complete<br/>
@@ -203,7 +146,7 @@
     </div>
     <div class="link-card">
       <div class="link-label">Source Code</div>
-      <div class="link-url">github.com/prdx-live/predix</div>
+      <div class="link-url">github.com/LimaDevBTC/predix</div>
     </div>
     <div class="link-card">
       <div class="link-label">Agent Docs</div>
@@ -211,6 +154,6 @@
     </div>
   </div>
 
-  <div class="thank-you">Buidl Battle 2 -- March 2026</div>
+  <div class="footer">Buidl Battle 2 -- March 2026</div>
 </body>
 </html>

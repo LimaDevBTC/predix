@@ -14,375 +14,308 @@
     height: 1080px;
     background: #09090b;
     color: #f4f4f5;
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     overflow: hidden;
-    position: relative;
-    padding: 60px;
+    padding: 48px 64px;
+    display: flex;
+    flex-direction: column;
   }
 
-  body::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-    background-size: 40px 40px;
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 36px;
   }
 
-  h1 {
-    text-align: center;
-    font-size: 32px;
+  .logo {
+    height: 40px;
+    object-fit: contain;
+    clip-path: inset(10% 0);
+  }
+
+  .header-title {
+    font-size: 24px;
     font-weight: 600;
-    margin-bottom: 48px;
     color: #a1a1aa;
-    letter-spacing: -0.5px;
-    position: relative;
-    z-index: 1;
   }
 
-  h1 strong { color: #f4f4f5; }
+  .header-title strong { color: #f4f4f5; }
 
   .diagram {
     display: flex;
     align-items: stretch;
     justify-content: center;
-    gap: 24px;
-    height: 780px;
-    position: relative;
-    z-index: 1;
+    gap: 14px;
+    flex: 1;
   }
 
-  .column {
+  .col {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 10px;
     justify-content: center;
   }
 
-  .column-label {
-    font-size: 11px;
+  .col-label {
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 3px;
-    color: #52525b;
+    letter-spacing: 2px;
     text-align: center;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-weight: 500;
   }
 
   .box {
-    padding: 20px 28px;
+    padding: 14px 20px;
     border-radius: 12px;
     border: 1px solid #27272a;
-    background: rgba(24,24,27,0.8);
-    min-width: 200px;
-    position: relative;
+    background: rgba(24,24,27,0.5);
+    min-width: 170px;
   }
 
   .box-title {
-    font-size: 17px;
+    font-size: 14px;
     font-weight: 600;
-    margin-bottom: 6px;
+    margin-bottom: 2px;
   }
 
-  .box-subtitle {
-    font-size: 13px;
-    color: #71717a;
+  .box-sub {
+    font-size: 11px;
     font-family: 'JetBrains Mono', monospace;
+    color: #71717a;
   }
 
-  .box-detail {
-    font-size: 12px;
-    color: #52525b;
-    margin-top: 8px;
-    line-height: 1.5;
-  }
-
-  /* Color coding */
-  .col-client .box { border-color: rgba(34,197,94,0.3); }
+  .col-client .col-label { color: #22C55E; }
+  .col-client .box { border-color: rgba(34,197,94,0.2); }
   .col-client .box-title { color: #22C55E; }
-  .col-client .column-label { color: #22C55E; }
 
-  .col-platform .box { border-color: rgba(59,130,246,0.3); }
+  .col-platform .col-label { color: #60A5FA; }
+  .col-platform .box { border-color: rgba(59,130,246,0.2); }
   .col-platform .box-title { color: #60A5FA; }
-  .col-platform .column-label { color: #60A5FA; }
 
-  .col-state .box { border-color: rgba(139,92,246,0.3); }
+  .col-state .col-label { color: #A78BFA; }
+  .col-state .box { border-color: rgba(168,139,250,0.2); }
   .col-state .box-title { color: #A78BFA; }
-  .col-state .column-label { color: #A78BFA; }
 
-  .col-chain .box { border-color: rgba(247,147,26,0.3); }
+  .col-chain .col-label { color: #F7931A; }
+  .col-chain .box { border-color: rgba(247,147,26,0.2); }
   .col-chain .box-title { color: #F7931A; }
-  .col-chain .column-label { color: #F7931A; }
 
-  .col-oracle .box { border-color: rgba(236,72,153,0.3); }
+  .col-oracle .col-label { color: #EC4899; }
+  .col-oracle .box { border-color: rgba(236,72,153,0.2); }
   .col-oracle .box-title { color: #EC4899; }
-  .col-oracle .column-label { color: #EC4899; }
 
-  /* Arrows */
   .arrow-col {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    width: 60px;
+    width: 36px;
     flex-shrink: 0;
-  }
-
-  .arrow {
     color: #3f3f46;
-    font-size: 28px;
-    position: relative;
+    font-size: 20px;
   }
 
-  .arrow-label {
-    font-size: 10px;
-    color: #52525b;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    white-space: nowrap;
-  }
-
-  /* Flow labels at bottom */
-  .flows {
-    position: absolute;
-    bottom: 40px;
-    left: 60px;
-    right: 60px;
+  .bottom-section {
+    margin-top: 24px;
     display: flex;
-    gap: 40px;
-    z-index: 1;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .flows {
+    display: flex;
+    gap: 32px;
   }
 
   .flow {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    font-size: 12px;
+    color: #71717a;
   }
 
   .flow-line {
-    width: 32px;
+    width: 24px;
     height: 2px;
+    border-radius: 1px;
   }
 
   .flow-line.green { background: #22C55E; }
   .flow-line.blue { background: #60A5FA; }
   .flow-line.orange { background: #F7931A; }
 
-  .flow-text {
-    font-size: 12px;
-    color: #71717a;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  /* Round lifecycle */
   .lifecycle {
-    position: absolute;
-    bottom: 100px;
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 0;
-    z-index: 1;
   }
 
-  .lifecycle-segment {
-    height: 32px;
+  .lifecycle-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #52525b;
+    margin-right: 12px;
+  }
+
+  .seg {
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     font-family: 'JetBrains Mono', monospace;
     border: 1px solid;
   }
 
   .seg-trade {
-    width: 500px;
-    border-color: rgba(34,197,94,0.4);
+    width: 240px;
+    border-color: rgba(34,197,94,0.3);
     color: #22C55E;
-    background: rgba(34,197,94,0.06);
+    background: rgba(34,197,94,0.05);
     border-radius: 6px 0 0 6px;
   }
 
   .seg-pre {
-    width: 100px;
-    border-color: rgba(247,147,26,0.4);
+    width: 60px;
+    border-color: rgba(247,147,26,0.3);
     color: #F7931A;
-    background: rgba(247,147,26,0.06);
+    background: rgba(247,147,26,0.05);
   }
 
   .seg-settle {
-    width: 120px;
-    border-color: rgba(139,92,246,0.4);
+    width: 80px;
+    border-color: rgba(168,139,250,0.3);
     color: #A78BFA;
-    background: rgba(139,92,246,0.06);
+    background: rgba(168,139,250,0.05);
     border-radius: 0 6px 6px 0;
-  }
-
-  .lifecycle-label {
-    position: absolute;
-    top: -20px;
-    left: 0;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: #52525b;
   }
 </style>
 </head>
 <body>
-  <h1><strong>Predix</strong> System Architecture</h1>
+  <div class="header">
+    <img src="../public/logo.png" alt="Predix" class="logo" />
+    <div class="header-title"><strong>System</strong> Architecture</div>
+  </div>
 
   <div class="diagram">
-    <!-- CLIENTS -->
-    <div class="column col-client">
-      <div class="column-label">Clients</div>
+    <div class="col col-client">
+      <div class="col-label">Clients</div>
       <div class="box">
         <div class="box-title">Browser</div>
-        <div class="box-subtitle">Xverse Wallet</div>
-        <div class="box-detail">Sign locally, zero gas</div>
+        <div class="box-sub">Xverse Wallet</div>
       </div>
       <div class="box">
         <div class="box-title">AI Agent</div>
-        <div class="box-subtitle">SDK / MCP / REST</div>
-        <div class="box-detail">Autonomous trading</div>
+        <div class="box-sub">SDK / MCP / REST</div>
       </div>
       <div class="box">
         <div class="box-title">Webhooks</div>
-        <div class="box-subtitle">HMAC-signed</div>
-        <div class="box-detail">6 event types</div>
+        <div class="box-sub">HMAC-SHA256</div>
       </div>
     </div>
 
-    <div class="arrow-col">
-      <div class="arrow">&#8594;</div>
-      <div class="arrow-label">signed tx</div>
-    </div>
+    <div class="arrow-col">&rarr;</div>
 
-    <!-- PLATFORM -->
-    <div class="column col-platform">
-      <div class="column-label">Platform</div>
+    <div class="col col-platform">
+      <div class="col-label">Platform</div>
       <div class="box">
         <div class="box-title">/api/sponsor</div>
-        <div class="box-subtitle">Validate + Sponsor</div>
-        <div class="box-detail">Add gas, broadcast</div>
+        <div class="box-sub">Validate + Sponsor + Broadcast</div>
       </div>
       <div class="box">
         <div class="box-title">/api/agent/*</div>
-        <div class="box-subtitle">10 endpoints</div>
-        <div class="box-detail">Market, trade, portfolio</div>
+        <div class="box-sub">10 REST endpoints</div>
       </div>
       <div class="box">
         <div class="box-title">/api/cron/*</div>
-        <div class="box-subtitle">Settlement + Jackpot</div>
-        <div class="box-detail">Every 60s + daily 21h</div>
+        <div class="box-sub">Settlement (60s) + Jackpot (daily)</div>
       </div>
       <div class="box">
-        <div class="box-title">@predix/mcp</div>
-        <div class="box-subtitle">7 tools, 2 resources</div>
-        <div class="box-detail">Claude, Cursor, Windsurf</div>
+        <div class="box-title">@predixlive/mcp</div>
+        <div class="box-sub">7 tools, 2 resources</div>
       </div>
     </div>
 
-    <div class="arrow-col">
-      <div class="arrow">&#8596;</div>
-      <div class="arrow-label">read/write</div>
-    </div>
+    <div class="arrow-col">&harr;</div>
 
-    <!-- STATE -->
-    <div class="column col-state">
-      <div class="column-label">State</div>
+    <div class="col col-state">
+      <div class="col-label">State</div>
       <div class="box">
         <div class="box-title">Upstash Redis</div>
-        <div class="box-subtitle">Optimistic pools</div>
-        <div class="box-detail">Nonces, tickets, keys</div>
+        <div class="box-sub">Pools, nonces, tickets, keys</div>
       </div>
       <div class="box">
-        <div class="box-title">Merge Strategy</div>
-        <div class="box-subtitle">max(chain, redis)</div>
-        <div class="box-detail">Instant UX, eventual truth</div>
+        <div class="box-title">Merge: max(chain, kv)</div>
+        <div class="box-sub">Instant UX, eventual truth</div>
       </div>
     </div>
 
-    <div class="arrow-col">
-      <div class="arrow">&#8594;</div>
-      <div class="arrow-label">contract call</div>
-    </div>
+    <div class="arrow-col">&rarr;</div>
 
-    <!-- BLOCKCHAIN -->
-    <div class="column col-chain">
-      <div class="column-label">Blockchain</div>
+    <div class="col col-chain">
+      <div class="col-label">Blockchain</div>
       <div class="box">
-        <div class="box-title">gatewayv6</div>
-        <div class="box-subtitle">Thin proxy</div>
-        <div class="box-detail">Access control, pause</div>
+        <div class="box-title">gatewayv6.clar</div>
+        <div class="box-sub">Access control + pause</div>
       </div>
       <div class="box">
-        <div class="box-title">predixv7</div>
-        <div class="box-subtitle">Market + Jackpot</div>
-        <div class="box-detail">Resolve, distribute, fees</div>
+        <div class="box-title">predixv7.clar</div>
+        <div class="box-sub">Market + jackpot treasury</div>
       </div>
       <div class="box">
-        <div class="box-title">test-usdcx</div>
-        <div class="box-subtitle">SIP-010 token</div>
-        <div class="box-detail">6 decimals, 1k mint</div>
+        <div class="box-title">test-usdcx.clar</div>
+        <div class="box-sub">SIP-010 (6 decimals)</div>
       </div>
       <div class="box">
         <div class="box-title">Stacks Testnet</div>
-        <div class="box-subtitle">~10s blocks</div>
-        <div class="box-detail">Finalized on Bitcoin</div>
+        <div class="box-sub">~10s blocks, BTC finality</div>
       </div>
     </div>
 
-    <div class="arrow-col">
-      <div class="arrow">&#8592;</div>
-      <div class="arrow-label">price feed</div>
-    </div>
+    <div class="arrow-col">&larr;</div>
 
-    <!-- ORACLE -->
-    <div class="column col-oracle">
-      <div class="column-label">Oracle</div>
+    <div class="col col-oracle">
+      <div class="col-label">Oracle</div>
       <div class="box">
         <div class="box-title">Pyth Hermes</div>
-        <div class="box-subtitle">SSE stream</div>
-        <div class="box-detail">Live BTC/USD price</div>
+        <div class="box-sub">SSE live stream</div>
       </div>
       <div class="box">
         <div class="box-title">Pyth Benchmarks</div>
-        <div class="box-subtitle">REST API</div>
-        <div class="box-detail">Settlement price</div>
+        <div class="box-sub">Settlement price</div>
       </div>
       <div class="box">
         <div class="box-title">Circuit Breaker</div>
-        <div class="box-subtitle">2-layer validation</div>
-        <div class="box-detail">0.3% + 0.5% + 1% bound</div>
+        <div class="box-sub">0.3% + 0.5% + 1% bounds</div>
       </div>
     </div>
   </div>
 
-  <div class="lifecycle">
-    <div class="lifecycle-label">Round Lifecycle (60s)</div>
-    <div class="lifecycle-segment seg-trade">TRADING (0-50s)</div>
-    <div class="lifecycle-segment seg-pre">PRE (50-60s)</div>
-    <div class="lifecycle-segment seg-settle">SETTLE (60s+)</div>
-  </div>
+  <div class="bottom-section">
+    <div class="flows">
+      <div class="flow">
+        <div class="flow-line green"></div>
+        Bet: Sign &rarr; Sponsor &rarr; Gateway &rarr; predixv7
+      </div>
+      <div class="flow">
+        <div class="flow-line blue"></div>
+        Settle: Cron &rarr; Pyth &rarr; Gateway &rarr; resolve-and-distribute
+      </div>
+      <div class="flow">
+        <div class="flow-line orange"></div>
+        Jackpot: BTC block hash &rarr; Gateway &rarr; pay-jackpot-winner
+      </div>
+    </div>
 
-  <div class="flows">
-    <div class="flow">
-      <div class="flow-line green"></div>
-      <div class="flow-text">Bet: User signs -> Sponsor -> Gateway -> predixv7</div>
-    </div>
-    <div class="flow">
-      <div class="flow-line blue"></div>
-      <div class="flow-text">Settle: Cron -> Pyth -> Gateway -> resolve-and-distribute</div>
-    </div>
-    <div class="flow">
-      <div class="flow-line orange"></div>
-      <div class="flow-text">Jackpot: BTC block hash -> Gateway -> pay-jackpot-winner</div>
+    <div class="lifecycle">
+      <div class="lifecycle-label">Round (60s)</div>
+      <div class="seg seg-trade">TRADE 0-50s</div>
+      <div class="seg seg-pre">PRE</div>
+      <div class="seg seg-settle">SETTLE</div>
     </div>
   </div>
 </body>

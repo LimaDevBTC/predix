@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=1920,height=1080">
 <title>Predix - The Problem</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -14,159 +14,145 @@
     height: 1080px;
     background: #09090b;
     color: #f4f4f5;
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    position: relative;
   }
 
-  body::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(239,68,68,0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(239,68,68,0.02) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
-  .section-label {
-    font-size: 14px;
+  .section-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 20px;
+    border-radius: 12px;
+    font-size: 13px;
     font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 4px;
+    background: rgba(239,68,68,0.1);
     color: #EF4444;
+    border: 1px solid rgba(239,68,68,0.2);
+    text-transform: uppercase;
+    letter-spacing: 2px;
     margin-bottom: 32px;
   }
 
   h1 {
-    font-size: 56px;
+    font-size: 52px;
     font-weight: 700;
     letter-spacing: -1px;
-    margin-bottom: 80px;
+    margin-bottom: 72px;
     text-align: center;
     color: #f4f4f5;
   }
 
   .problems {
     display: flex;
-    gap: 48px;
+    gap: 32px;
     max-width: 1400px;
   }
 
-  .problem-card {
+  .card {
     flex: 1;
-    padding: 48px 40px;
+    padding: 40px 36px;
+    border-radius: 12px;
     border: 1px solid #27272a;
-    border-radius: 16px;
-    background: rgba(39,39,42,0.3);
+    background: rgba(24,24,27,0.5);
     position: relative;
-    overflow: hidden;
   }
 
-  .problem-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #EF4444, transparent);
-  }
-
-  .problem-number {
-    font-size: 64px;
-    font-weight: 800;
-    color: rgba(239,68,68,0.15);
+  .card-number {
+    font-size: 56px;
+    font-weight: 700;
+    color: rgba(239,68,68,0.08);
     font-family: 'JetBrains Mono', monospace;
     position: absolute;
-    top: 16px;
-    right: 24px;
+    top: 20px;
+    right: 28px;
+    line-height: 1;
   }
 
-  .problem-icon {
-    font-size: 40px;
+  .card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     margin-bottom: 24px;
-    display: block;
-    width: 64px;
-    height: 64px;
-    line-height: 64px;
-    text-align: center;
-    border-radius: 16px;
     background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.2);
   }
 
-  .problem-title {
-    font-size: 28px;
+  .card-icon svg {
+    width: 24px;
+    height: 24px;
+    stroke: #EF4444;
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .card-title {
+    font-size: 24px;
     font-weight: 600;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     color: #f4f4f5;
   }
 
-  .problem-desc {
-    font-size: 18px;
+  .card-desc {
+    font-size: 17px;
     font-weight: 300;
     color: #a1a1aa;
     line-height: 1.6;
   }
 
-  .problem-desc strong {
+  .card-desc strong {
     color: #EF4444;
     font-weight: 500;
   }
-
-  .corner {
-    position: absolute;
-    width: 40px;
-    height: 40px;
-  }
-  .corner-tl { top: 40px; left: 40px; border-top: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-tr { top: 40px; right: 40px; border-top: 2px solid #27272a; border-right: 2px solid #27272a; }
-  .corner-bl { bottom: 40px; left: 40px; border-bottom: 2px solid #27272a; border-left: 2px solid #27272a; }
-  .corner-br { bottom: 40px; right: 40px; border-bottom: 2px solid #27272a; border-right: 2px solid #27272a; }
 </style>
 </head>
 <body>
-  <div class="corner corner-tl"></div>
-  <div class="corner corner-tr"></div>
-  <div class="corner corner-bl"></div>
-  <div class="corner corner-br"></div>
-
-  <div class="section-label">The Problem</div>
+  <div class="section-badge">The Problem</div>
 
   <h1>Prediction markets are broken.</h1>
 
   <div class="problems">
-    <div class="problem-card">
-      <div class="problem-number">01</div>
-      <div class="problem-icon">&#9203;</div>
-      <div class="problem-title">Too Slow</div>
-      <div class="problem-desc">
+    <div class="card">
+      <div class="card-number">01</div>
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="card-title">Too Slow</div>
+      <div class="card-desc">
         Rounds last <strong>hours or days</strong>.
         By the time you get a result,
         you have already lost interest.
       </div>
     </div>
 
-    <div class="problem-card">
-      <div class="problem-number">02</div>
-      <div class="problem-icon">&#9981;</div>
-      <div class="problem-title">Too Expensive</div>
-      <div class="problem-desc">
+    <div class="card">
+      <div class="card-number">02</div>
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="card-title">Too Expensive</div>
+      <div class="card-desc">
         Every bet costs <strong>gas</strong>.
         For small trades, fees eat a
         significant portion of your position.
       </div>
     </div>
 
-    <div class="problem-card">
-      <div class="problem-number">03</div>
-      <div class="problem-icon">&#9940;</div>
-      <div class="problem-title">Human-Only</div>
-      <div class="problem-desc">
+    <div class="card">
+      <div class="card-number">03</div>
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+      </div>
+      <div class="card-title">Human-Only</div>
+      <div class="card-desc">
         No standard way for an <strong>AI agent</strong>
         to discover a market, authenticate,
         and trade autonomously.

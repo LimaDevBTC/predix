@@ -93,8 +93,11 @@ export function MarketCardV4() {
   const roundId = round?.id ?? null
   const lastRoundIdRef = useRef<number | null>(null)
   const openPriceRef = useRef<number | null>(null)
+  const lastKnownPriceRef = useRef<number | null>(null)
   const sessionIdRef = useRef<string>('')
   const fetchingOpenForRef = useRef<number | null>(null)
+  const serverOffsetRef = useRef(0) // serverNow - Date.now(), corrects client clock skew
+  const serverNow = () => Date.now() + serverOffsetRef.current
 
   // Generate anonymous session ID for active user tracking
   useEffect(() => {
@@ -110,7 +113,7 @@ export function MarketCardV4() {
   useEffect(() => {
     const tick = () => {
       const roundStartMs = (round?.id ?? 0) * 60 * 1000
-      const elapsed = (Date.now() - roundStartMs) / 1000
+      const elapsed = (serverNow() - roundStartMs) / 1000
       setEarlySecsLeft(Math.max(0, Math.ceil(20 - elapsed)))
     }
     tick()
@@ -131,6 +134,10 @@ export function MarketCardV4() {
   // Pyth price em tempo real
   const { price: currentPrice, loading: priceLoading, error: priceError } = usePythPrice()
 
+  // Keep a persistent ref of the last known price so round-transition logic
+  // never silently fails when the SSE stream drops momentarily.
+  if (currentPrice) lastKnownPriceRef.current = currentPrice
+
   // Atualiza round a cada segundo
   useEffect(() => {
     const updateRound = () => {
@@ -143,14 +150,15 @@ export function MarketCardV4() {
         const prevOpenPrice = openPriceRef.current
         const prevPool = poolRef.current
         // Only calculate result if bets belong to the round that just ended
-        if (prevBets && prevBets.roundId === lastRoundIdRef.current && (prevBets.up > 0 || prevBets.down > 0) && prevOpenPrice && currentPrice) {
+        const closePrice = currentPrice || lastKnownPriceRef.current
+        if (prevBets && prevBets.roundId === lastRoundIdRef.current && (prevBets.up > 0 || prevBets.down > 0) && prevOpenPrice && closePrice) {
           const prevHasCounterparty = hasCounterpartyRef.current
 
           // No counterparty = round invalid, bets refunded
           if (!prevHasCounterparty || !prevPool || prevPool.totalUp === 0 || prevPool.totalDown === 0) {
             setRoundResult({
               roundId: prevBets.roundId,
-              outcome: currentPrice > prevOpenPrice ? 'UP' : 'DOWN',
+              outcome: closePrice > prevOpenPrice ? 'UP' : 'DOWN',
               netPnL: null,
               poolPnL: null,
               ticketsEarned: 0,
@@ -158,7 +166,7 @@ export function MarketCardV4() {
               refund: true,
             })
           } else {
-            const outcome: 'UP' | 'DOWN' = currentPrice > prevOpenPrice ? 'UP' : 'DOWN'
+            const outcome: 'UP' | 'DOWN' = closePrice > prevOpenPrice ? 'UP' : 'DOWN'
             const totalCost = prevBets.up + prevBets.down
             const winningBet = outcome === 'UP' ? prevBets.up : prevBets.down
 
@@ -316,16 +324,14 @@ export function MarketCardV4() {
   useEffect(() => { hasCounterpartyRef.current = hasCounterparty }, [hasCounterparty])
 
   // Auto-dismiss round result after 8s + confetti on win (not on refund)
+  const winCountRef = useRef(0)
   useEffect(() => {
     if (!roundResult) return
     if (roundResult.won && !roundResult.refund) {
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.7 },
-        colors: ['#22c55e', '#4ade80', '#86efac', '#fbbf24', '#f59e0b'],
-        disableForReducedMotion: true,
-      })
+      winCountRef.current += 1
+      // Double burst for reliable visual feedback across rounds
+      confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, colors: ['#22c55e', '#4ade80', '#86efac', '#fbbf24', '#f59e0b'], disableForReducedMotion: true })
+      setTimeout(() => confetti({ particleCount: 40, spread: 70, origin: { y: 0.6 }, colors: ['#22c55e', '#fbbf24', '#f59e0b'], disableForReducedMotion: true }), 250)
     }
     const timer = setTimeout(() => setRoundResult(null), 8000)
     return () => clearTimeout(timer)
@@ -349,6 +355,11 @@ export function MarketCardV4() {
       if (!res.ok) return
       const data = await res.json()
       if (!data.ok) return
+
+      // Sync server clock offset for accurate early-window calculations
+      if (data.serverNow) {
+        serverOffsetRef.current = data.serverNow - Date.now()
+      }
 
       // Validate roundId — discard data from a different round
       const apiRoundId = parseInt(String(data.round?.id ?? '').replace('round-', ''), 10)
@@ -736,10 +747,6 @@ export function MarketCardV4() {
 
     const amountMicro = Math.round(v * 1e6) // 6 decimais
 
-    // Early flag determined off-chain by sponsor (no on-chain param in predixv3)
-    const roundStartMs = (round.id) * 60 * 1000
-    const isEarly = Date.now() - roundStartMs < 20_000
-
     try {
       const publicKey = await requirePublicKey()
       const txid = await sponsoredContractCall({
@@ -754,6 +761,12 @@ export function MarketCardV4() {
         publicKey,
       })
       console.log('Bet sponsored & broadcast:', txid)
+
+      // Early flag determined AFTER broadcast (wallet sign can take seconds)
+      // Use 2s safety buffer: if broadcast lands after 18s, don't mark as early
+      // (wallet signing delay can shift perceived time vs actual server time)
+      const roundStartMs = (round.id) * 60 * 1000
+      const isEarly = serverNow() - roundStartMs < 18_000
 
       if (isEarly) {
         setIsEarlyBet(true)
@@ -1201,9 +1214,9 @@ export function MarketCardV4() {
                           <div className="bg-down/70 transition-all duration-500" style={{ width: `${100 - upPct}%` }} />
                         </div>
                         <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
-                          <span>{Math.round(upPct)}% UP</span>
-                          <span>${realTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })} pool</span>
-                          <span>{Math.round(100 - upPct)}% DOWN</span>
+                          <span className="shrink-0">{Math.round(upPct)}% UP</span>
+                          <span className="truncate px-1">${realTotal >= 1_000_000 ? `${(realTotal / 1_000_000).toFixed(1)}M` : realTotal >= 1000 ? `${(realTotal / 1000).toFixed(1)}K` : realTotal.toFixed(0)} pool</span>
+                          <span className="shrink-0">{Math.round(100 - upPct)}% DOWN</span>
                         </div>
                       </div>
                     )

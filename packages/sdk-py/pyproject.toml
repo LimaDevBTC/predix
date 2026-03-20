@@ -22,7 +22,7 @@ crewai = ["crewai>=0.1.0"]
 [project.urls]
 Homepage = "https://www.predix.live"
 Documentation = "https://www.predix.live/docs/agents"
-Repository = "https://github.com/prdx-live/predix"
+Repository = "https://github.com/LimaDevBTC/predix"
 
 [tool.hatch.build.targets.wheel]
 packages = ["predix"]

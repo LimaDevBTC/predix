@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { CircleCheck, CircleX, Ticket, Clock } from 'lucide-react'
+// import { getLocalStorage, isConnected } from '@stacks/connect'
 import dynamic from 'next/dynamic'
 import { Footer } from './Footer'
 
@@ -76,6 +77,12 @@ function formatUsd(v: number): string {
   return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function formatCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return n.toFixed(2)
+}
+
 function formatPrice(v: number): string {
   return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -148,9 +155,10 @@ function Identicon({ address }: { address: string }) {
 // STAT CARD
 // ============================================================================
 
-function StatCard({ label, value, subtext, color, large }: {
+function StatCard({ label, value, title, subtext, color, large }: {
   label: string
   value: string
+  title?: string
   subtext?: string
   color?: 'up' | 'down' | 'default'
   large?: boolean
@@ -158,9 +166,9 @@ function StatCard({ label, value, subtext, color, large }: {
   return (
     <div className={`bg-zinc-900/50 rounded-xl border border-zinc-800 p-4 ${large ? 'col-span-2' : ''}`}>
       <div className="text-xs text-zinc-500 mb-1">{label}</div>
-      <div className={`font-mono text-lg sm:text-xl font-bold ${
+      <div className={`font-mono text-lg sm:text-xl font-bold truncate ${
         color === 'up' ? 'text-up' : color === 'down' ? 'text-down' : 'text-zinc-100'
-      }`}>
+      }`} title={title}>
         {value}
       </div>
       {subtext && <div className="text-[11px] text-zinc-500 mt-0.5">{subtext}</div>}
@@ -354,6 +362,7 @@ export default function ProfilePage({ address }: { address: string }) {
   const [expandedBetIdx, setExpandedBetIdx] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
   const [jackpot, setJackpot] = useState<{ balance: number; totalTickets: number; userTickets: number; countdownMs: number } | null>(null)
+  // Read connected wallet address (unused after label simplification, kept for future use)
 
   // Fetch jackpot status for this wallet
   useEffect(() => {
@@ -557,7 +566,8 @@ export default function ProfilePage({ address }: { address: string }) {
             <div className="grid grid-cols-3 gap-3">
               <StatCard
                 label="Volume"
-                value={`$${formatUsd(stats.totalVolumeUsd)}`}
+                value={stats.totalVolumeUsd >= 10_000 ? `$${formatCompact(stats.totalVolumeUsd)}` : `$${formatUsd(stats.totalVolumeUsd)}`}
+                title={`$${formatUsd(stats.totalVolumeUsd)}`}
                 subtext={`${stats.totalBets} predictions`}
               />
               <StatCard
@@ -635,7 +645,7 @@ export default function ProfilePage({ address }: { address: string }) {
                     <div className="text-[10px] text-zinc-600">10% of ${jackpot.balance.toFixed(0)}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Your Tickets</div>
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Tickets</div>
                     <div className="text-lg font-mono font-bold text-bitcoin mt-0.5">
                       {jackpot.userTickets}
                     </div>

@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predix — Product Pitch Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #09090b;
+    --surface: #18181b;
+    --border: #27272a;
+    --muted: #71717a;
+    --subtle: #a1a1aa;
+    --text: #f4f4f5;
+    --green: #22C55E;
+    --red: #EF4444;
+    --orange: #F7931A;
+    --purple: #A78BFA;
+    --blue: #60A5FA;
+    --pink: #EC4899;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  /* ── Slide Engine ── */
+  .deck {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 80px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .slide-logo {
+    position: absolute;
+    top: 32px;
+    left: 40px;
+    height: 48px;
+    object-fit: contain;
+    opacity: 0.85;
+  }
+
+  .slide.active {
+    display: flex;
+    opacity: 1;
+  }
+
+  /* ── Navigation ── */
+  .nav {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 100;
+    background: rgba(24,24,27,0.9);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 20px;
+    backdrop-filter: blur(12px);
+  }
+
+  .nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--subtle);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .nav button:hover {
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+
+  .nav .counter {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 48px;
+    text-align: center;
+  }
+
+  /* ── Shared Components ── */
+  .section-badge {
+    display: inline-flex;
+    padding: 8px 20px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 32px;
+    width: fit-content;
+  }
+
+  .badge-red { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+  .badge-green { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+  .badge-purple { background: rgba(168,139,250,0.1); color: var(--purple); border: 1px solid rgba(168,139,250,0.2); }
+  .badge-orange { background: rgba(247,147,26,0.1); color: var(--orange); border: 1px solid rgba(247,147,26,0.2); }
+  .badge-blue { background: rgba(59,130,246,0.1); color: var(--blue); border: 1px solid rgba(59,130,246,0.2); }
+
+  h1 {
+    font-size: clamp(36px, 4vw, 52px);
+    font-weight: 700;
+    letter-spacing: -1px;
+    text-align: center;
+    line-height: 1.15;
+  }
+
+  h1 strong { font-weight: 700; }
+
+  .card {
+    padding: 36px 32px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(24,24,27,0.5);
+  }
+
+  .card-title {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  .card-desc {
+    font-size: 16px;
+    font-weight: 300;
+    color: var(--subtle);
+    line-height: 1.6;
+  }
+
+  .card-desc strong { font-weight: 500; }
+
+  /* ── Slide 1: Opening ── */
+  .s1-tagline {
+    font-size: clamp(28px, 3vw, 36px);
+    font-weight: 300;
+    color: var(--subtle);
+    letter-spacing: 0.3px;
+    margin-bottom: 64px;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .s1-tagline strong {
+    color: var(--orange);
+    font-weight: 500;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .stat-card {
+    text-align: center;
+    padding: 28px 44px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(24,24,27,0.5);
+    min-width: 200px;
+  }
+
+  .stat-value {
+    font-size: 44px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 6px;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  .built-on {
+    margin-top: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 16px;
+    color: var(--muted);
+  }
+
+  .built-on .badge {
+    display: inline-flex;
+    padding: 8px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    background: rgba(247,147,26,0.1);
+    color: var(--orange);
+    border: 1px solid rgba(247,147,26,0.2);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #3f3f46;
+  }
+
+  /* ── Slide 2: Problem ── */
+  .problems-grid {
+    display: flex;
+    gap: 28px;
+    max-width: 1300px;
+    margin-top: 56px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .problems-grid .card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 420px;
+    position: relative;
+  }
+
+  .card-number {
+    font-size: 48px;
+    font-weight: 700;
+    color: rgba(239,68,68,0.08);
+    font-family: 'JetBrains Mono', monospace;
+    position: absolute;
+    top: 16px;
+    right: 24px;
+    line-height: 1;
+  }
+
+  .card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.2);
+  }
+
+  .card-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke: var(--red);
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .card-desc .red { color: var(--red); }
+
+  /* ── Slide 3: Solution ── */
+  .solutions-grid {
+    display: flex;
+    gap: 28px;
+    max-width: 1300px;
+    margin-top: 56px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .solutions-grid .card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 420px;
+  }
+
+  .card-badge {
+    display: inline-flex;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .card-metric {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-top: 20px;
+    margin-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .metric-value {
+    font-size: 32px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .metric-label {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* ── Slide 4: How It Works ── */
+  .flow-container {
+    margin-top: 48px;
+    max-width: 1200px;
+    width: 100%;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    justify-content: center;
+  }
+
+  .flow-label {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 120px;
+    text-align: right;
+  }
+
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .flow-step {
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(24,24,27,0.5);
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--subtle);
+  }
+
+  .flow-arrow {
+    color: #3f3f46;
+    font-size: 18px;
+  }
+
+  .timeline-bar {
+    display: flex;
+    max-width: 800px;
+    margin: 40px auto 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .timeline-segment {
+    padding: 16px 24px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .timeline-segment .t-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Slide 5: Architecture ── */
+  .arch-grid {
+    display: flex;
+    gap: 12px;
+    max-width: 1400px;
+    width: 100%;
+    margin-top: 40px;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    justify-content: center;
+  }
+
+  .arch-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .arch-col-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .arch-box {
+    padding: 14px 18px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(24,24,27,0.5);
+  }
+
+  .arch-box-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .arch-box-sub {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+  }
+
+  .arch-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3f3f46;
+    font-size: 20px;
+    width: 32px;
+    flex-shrink: 0;
+  }
+
+  .security-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .security-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--subtle);
+    background: rgba(24,24,27,0.5);
+    border: 1px solid var(--border);
+  }
+
+  .security-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+  }
+
+  /* ── Slide 6: Agent Platform ── */
+  .agent-layout {
+    display: flex;
+    gap: 48px;
+    max-width: 1300px;
+    width: 100%;
+    margin-top: 40px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .agent-left {
+    flex: 1;
+    min-width: 320px;
+  }
+
+  .agent-left .subtitle {
+    font-size: 17px;
+    font-weight: 300;
+    color: var(--subtle);
+    line-height: 1.6;
+    margin-bottom: 36px;
+    max-width: 480px;
+  }
+
+  .integrations-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-width: 420px;
+  }
+
+  .integration-card {
+    padding: 14px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(24,24,27,0.5);
+  }
+
+  .integration-name {
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 2px;
+    color: var(--text);
+  }
+
+  .integration-desc {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .agent-right {
+    flex: 1;
+    min-width: 360px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .code-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    width: 100%;
+    max-width: 560px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.9;
+    position: relative;
+  }
+
+  .code-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 18px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    background: rgba(39,39,42,0.5);
+    border-bottom: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .code-dots {
+    display: inline-flex;
+    gap: 5px;
+    margin-right: 10px;
+  }
+
+  .code-dots span {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #3f3f46;
+  }
+
+  .code-content {
+    margin-top: 24px;
+  }
+
+  .brace { color: var(--muted); }
+  .key { color: var(--purple); }
+  .string { color: var(--green); }
+  .comment { color: #52525b; font-style: italic; }
+
+  /* ── Slide 7: Numbers ── */
+  .numbers-text {
+    font-size: clamp(22px, 2.5vw, 26px);
+    font-weight: 300;
+    color: var(--subtle);
+    text-align: center;
+    line-height: 1.5;
+    max-width: 700px;
+    margin-bottom: 48px;
+  }
+
+  .features-row {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+
+  .feature-card {
+    text-align: center;
+    padding: 22px 30px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(24,24,27,0.5);
+    min-width: 130px;
+  }
+
+  .feature-value {
+    font-size: 30px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .feature-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  .links-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .link-card {
+    padding: 18px 32px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(24,24,27,0.5);
+    text-align: center;
+    min-width: 220px;
+  }
+
+  .link-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .link-url {
+    font-size: 16px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--orange);
+  }
+
+  .slide-footer {
+    position: absolute;
+    bottom: 24px;
+    font-size: 13px;
+    color: #3f3f46;
+  }
+
+  /* ── Print / PDF ── */
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+
+  @media print {
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+
+    html, body {
+      overflow: visible;
+      background: #09090b !important;
+      width: 100% !important;
+      height: auto !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .nav { display: none !important; }
+
+    .deck {
+      height: auto !important;
+      position: relative;
+    }
+
+    .slide {
+      position: relative !important;
+      display: flex !important;
+      opacity: 1 !important;
+      background: #09090b !important;
+      min-height: 100vh;
+      height: 100vh;
+      max-height: 100vh;
+      overflow: hidden;
+      page-break-after: always;
+      break-after: page;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .slide:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    .card, .stat-card, .feature-card, .link-card, .arch-box,
+    .integration-card, .code-block, .flow-row, .security-badge,
+    .timeline-bar, .flow-container, .problems-grid, .solutions-grid,
+    .agent-layout, .arch-grid, .features-row, .links-row {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="deck">
+
+  <!-- ═══ SLIDE 1: OPENING ═══ -->
+  <div class="slide active" data-slide="1">
+    <img src="../public/logo.png" alt="Predix" class="slide-logo" />
+    <div class="s1-tagline">
+      The first <strong>agent-native</strong> prediction market on Bitcoin.
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" style="color: var(--text)">60s</div>
+        <div class="stat-label">Round Duration</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color: var(--green)">$0</div>
+        <div class="stat-label">Gas Fees</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color: var(--orange)">100%</div>
+        <div class="stat-label">On-Chain</div>
+      </div>
+    </div>
+
+    <div class="built-on">
+      <span>Built on</span>
+      <div class="badge">Stacks</div>
+      <div class="dot"></div>
+      <div class="badge">Finality on Bitcoin</div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 2: PROBLEM ═══ -->
+  <div class="slide" data-slide="2">
+    <img src="../public/logo.png" alt="Predix" class="slide-logo" />
+    <div class="section-badge badge-red">The Problem</div>
+    <h1>Prediction markets are broken.</h1>
+
+    <div class="problems-grid">
+      <div class="card">
+        <div class="card-number">01</div>
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="card-title">Too Slow</div>
+        <div class="card-desc">
+          Rounds last <strong class="red">hours or days</strong>.
+          By the time you get a result,
+          you have already lost interest.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-number">02</div>
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="card-title">Too Expensive</div>
+        <div class="card-desc">
+          Every prediction costs <strong class="red">gas</strong>.
+          For small positions, fees eat a
+          significant portion of your position.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-number">03</div>
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        </div>
+        <div class="card-title">Human-Only</div>
+        <div class="card-desc">
+          No standard way for an <strong class="red">AI agent</strong>
+          to discover a market, authenticate,
+          and predict autonomously.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 3: SOLUTION ═══ -->
+  <div class="slide" data-slide="3">
+    <img src="../public/logo.png" alt="Predix" class="slide-logo" />
+    <div class="section-badge badge-green">The Solution</div>
+    <h1>Predix solves <strong style="color:var(--green)">all three</strong>.</h1>
+
+    <div class="solutions-grid">
+      <div class="card">
+        <div class="card-badge badge-green">Speed</div>
+        <div class="card-title">60-Second Rounds</div>
+        <div class="card-desc">
+          Continuous 1-minute BTC/USD prediction rounds.
+          Live pricing from Pyth Network oracle.
+          Result in under a minute.
+        </div>
+        <div class="card-metric">
+          <div class="metric-value" style="color:var(--green)">60s</div>
+          <div class="metric-label">per round</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge badge-orange">Cost</div>
+        <div class="card-title">Zero Gas Fees</div>
+        <div class="card-desc">
+          Every transaction is sponsored.
+          Users sign locally. No gas, no friction,
+          no barrier to entry.
+        </div>
+        <div class="card-metric">
+          <div class="metric-value" style="color:var(--orange)">$0.00</div>
+          <div class="metric-label">gas per transaction</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge badge-purple">Agents</div>
+        <div class="card-title">Agent-Native</div>
+        <div class="card-desc">
+          REST API, MCP server, TypeScript SDK,
+          Python SDK. AI agents discover, register,
+          and predict autonomously.
+        </div>
+        <div class="card-metric">
+          <div class="metric-value" style="color:var(--purple)">4</div>
+          <div class="metric-label">integration paths</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 4: HOW IT WORKS ═══ -->
+  <div class="slide" data-slide="4">
+    <img src="../public/logo.png" alt="Predix" class="slide-logo" />
+    <div class="section-badge badge-blue">How It Works</div>
+    <h1>From prediction to payout in 60 seconds.</h1>
+
+    <div class="flow-container">
+      <div class="flow-row">
+        <div class="flow-label" style="color:var(--green)">Predict</div>
+        <div class="flow-steps">
+          <div class="flow-step">User signs locally</div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-step">/api/sponsor</div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-step">Gateway validates</div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-step" style="border-color:rgba(247,147,26,0.3)">On-chain</div>
+        </div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-label" style="color:var(--orange)">Settle</div>
+        <div class="flow-steps">
+          <div class="flow-step">Cron (every 60s)</div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-step">Pyth price oracle</div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-step">Circuit breaker</div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-step" style="border-color:rgba(247,147,26,0.3)">Resolve + Distribute</div>
+        </div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-label" style="color:var(--purple)">Jackpot</div>
+        <div class="flow-steps">
+          <div class="flow-step">Daily draw (21h ET)</div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-step">BTC block hash</div>
+          <span class="flow-arrow">&rarr;</span>
+          <div class="flow-step" style="border-color:rgba(247,147,26,0.3)">Pay winner on-chain</div>
+        </div>
+      </div>
+
+      <div class="timeline-bar">
+        <div class="timeline-segment" style="flex:5; background:rgba(34,197,94,0.1); color:var(--green);">
+          PREDICT
+          <div class="t-label">0 &ndash; 50s</div>
+        </div>
+        <div class="timeline-segment" style="flex:1; background:rgba(247,147,26,0.1); color:var(--orange);">
+          SETTLE
+          <div class="t-label">50 &ndash; 60s</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 5: ARCHITECTURE ═══ -->
+  <div class="slide" data-slide="5">
+    <img src="../public/logo.png" alt="Predix" class="slide-logo" />
+    <div class="section-badge badge-orange">Architecture</div>
+    <h1>Fully on-chain. Finality on Bitcoin.</h1>
+
+    <div class="arch-grid">
+      <div class="arch-col">
+        <div class="arch-col-label" style="color:var(--green)">Clients</div>
+        <div class="arch-box" style="border-color:rgba(34,197,94,0.2)">
+          <div class="arch-box-title" style="color:var(--green)">Browser</div>
+          <div class="arch-box-sub">Xverse Wallet</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(34,197,94,0.2)">
+          <div class="arch-box-title" style="color:var(--green)">AI Agent</div>
+          <div class="arch-box-sub">SDK / MCP / REST</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(34,197,94,0.2)">
+          <div class="arch-box-title" style="color:var(--green)">Webhooks</div>
+          <div class="arch-box-sub">HMAC-signed</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">&rarr;</div>
+
+      <div class="arch-col">
+        <div class="arch-col-label" style="color:var(--blue)">Platform</div>
+        <div class="arch-box" style="border-color:rgba(59,130,246,0.2)">
+          <div class="arch-box-title" style="color:var(--blue)">/api/sponsor</div>
+          <div class="arch-box-sub">Validate + Broadcast</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(59,130,246,0.2)">
+          <div class="arch-box-title" style="color:var(--blue)">/api/agent/*</div>
+          <div class="arch-box-sub">10 endpoints</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(59,130,246,0.2)">
+          <div class="arch-box-title" style="color:var(--blue)">/api/cron/*</div>
+          <div class="arch-box-sub">Settlement + Jackpot</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(59,130,246,0.2)">
+          <div class="arch-box-title" style="color:var(--blue)">@predixlive/mcp</div>
+          <div class="arch-box-sub">7 tools, 2 resources</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">&harr;</div>
+
+      <div class="arch-col">
+        <div class="arch-col-label" style="color:var(--purple)">State</div>
+        <div class="arch-box" style="border-color:rgba(168,139,250,0.2)">
+          <div class="arch-box-title" style="color:var(--purple)">Upstash Redis</div>
+          <div class="arch-box-sub">Optimistic pools</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(168,139,250,0.2)">
+          <div class="arch-box-title" style="color:var(--purple)">Merge Strategy</div>
+          <div class="arch-box-sub">max(chain, redis)</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">&rarr;</div>
+
+      <div class="arch-col">
+        <div class="arch-col-label" style="color:var(--orange)">Blockchain</div>
+        <div class="arch-box" style="border-color:rgba(247,147,26,0.2)">
+          <div class="arch-box-title" style="color:var(--orange)">gatewayv7</div>
+          <div class="arch-box-sub">Thin proxy</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(247,147,26,0.2)">
+          <div class="arch-box-title" style="color:var(--orange)">predixv8</div>
+          <div class="arch-box-sub">Market + Jackpot</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(247,147,26,0.2)">
+          <div class="arch-box-title" style="color:var(--orange)">test-usdcx</div>
+          <div class="arch-box-sub">SIP-010 token</div>
+        </div>
+      </div>
+
+      <div class="arch-arrow">&larr;</div>
+
+      <div class="arch-col">
+        <div class="arch-col-label" style="color:var(--pink)">Oracle</div>
+        <div class="arch-box" style="border-color:rgba(236,72,153,0.2)">
+          <div class="arch-box-title" style="color:var(--pink)">Pyth Hermes</div>
+          <div class="arch-box-sub">SSE live price</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(236,72,153,0.2)">
+          <div class="arch-box-title" style="color:var(--pink)">Pyth Benchmarks</div>
+          <div class="arch-box-sub">Settlement price</div>
+        </div>
+        <div class="arch-box" style="border-color:rgba(236,72,153,0.2)">
+          <div class="arch-box-title" style="color:var(--pink)">Circuit Breaker</div>
+          <div class="arch-box-sub">2-layer validation</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="security-row">
+      <div class="security-badge"><div class="security-dot"></div>Gateway-only access</div>
+      <div class="security-badge"><div class="security-dot"></div>Timelocked upgrades</div>
+      <div class="security-badge"><div class="security-dot"></div>Two-layer circuit breaker</div>
+      <div class="security-badge"><div class="security-dot"></div>Local signing only</div>
+      <div class="security-badge"><div class="security-dot"></div>Emergency pause</div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 6: AGENT PLATFORM ═══ -->
+  <div class="slide" data-slide="6">
+    <img src="../public/logo.png" alt="Predix" class="slide-logo" />
+    <div class="section-badge badge-purple">Agent Platform</div>
+    <h1>Built for AI agents from day one.</h1>
+
+    <div class="agent-layout">
+      <div class="agent-left">
+        <div class="subtitle">
+          Four integration paths. Local signing. Rate-limited API keys.
+          Public leaderboard. Discovery manifests. Webhooks.
+        </div>
+        <div class="integrations-grid">
+          <div class="integration-card">
+            <div class="integration-name">REST API</div>
+            <div class="integration-desc">10 endpoints, OpenAPI spec</div>
+          </div>
+          <div class="integration-card">
+            <div class="integration-name">MCP Server</div>
+            <div class="integration-desc">Claude, Cursor, Windsurf</div>
+          </div>
+          <div class="integration-card">
+            <div class="integration-name">TypeScript SDK</div>
+            <div class="integration-desc">@predixlive/sdk</div>
+          </div>
+          <div class="integration-card">
+            <div class="integration-name">Python SDK</div>
+            <div class="integration-desc">predix-sdk</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="agent-right">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-dots"><span></span><span></span><span></span></span>
+            claude_desktop_config.json
+          </div>
+          <div class="code-content">
+            <span class="brace">{</span><br/>
+            &nbsp;&nbsp;<span class="key">"mcpServers"</span>: <span class="brace">{</span><br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"predix"</span>: <span class="brace">{</span><br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"command"</span>: <span class="string">"npx"</span>,<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"args"</span>: [<span class="string">"@predixlive/mcp"</span>],<br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"env"</span>: <span class="brace">{</span><br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"STACKS_PRIVATE_KEY"</span>: <span class="string">"..."</span><br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="brace">}</span><br/>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="brace">}</span><br/>
+            &nbsp;&nbsp;<span class="brace">}</span><br/>
+            <span class="brace">}</span><br/>
+            <br/>
+            <span class="comment">// 5 lines. Claude can now predict on Bitcoin.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 7: CLOSING ═══ -->
+  <div class="slide" data-slide="7">
+    <img src="../public/logo.png" alt="Predix" class="slide-logo" />
+    <div class="numbers-text">
+      A production-grade prediction market with a complete<br/>
+      agent platform. Live on Stacks testnet.
+    </div>
+
+    <div class="features-row">
+      <div class="feature-card">
+        <div class="feature-value">3</div>
+        <div class="feature-label">Smart Contracts</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-value">10</div>
+        <div class="feature-label">API Endpoints</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-value">3</div>
+        <div class="feature-label">SDKs</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-value">7</div>
+        <div class="feature-label">MCP Tools</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-value">6</div>
+        <div class="feature-label">Webhook Events</div>
+      </div>
+    </div>
+
+    <div class="links-row">
+      <div class="link-card">
+        <div class="link-label">Live Demo</div>
+        <div class="link-url">predix.live</div>
+      </div>
+      <div class="link-card">
+        <div class="link-label">Source Code</div>
+        <div class="link-url">github.com/LimaDevBTC/predix</div>
+      </div>
+      <div class="link-card">
+        <div class="link-label">Agent Docs</div>
+        <div class="link-url">predix.live/docs/agents</div>
+      </div>
+    </div>
+
+    <div class="slide-footer">Predix -- March 2026</div>
+  </div>
+
+</div>
+
+<!-- Navigation -->
+<div class="nav">
+  <button id="prev" aria-label="Previous slide">&larr;</button>
+  <span class="counter"><span id="current">1</span> / <span id="total">7</span></span>
+  <button id="next" aria-label="Next slide">&rarr;</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+
+  function show(n) {
+    slides[current].classList.remove('active');
+    current = ((n % total) + total) % total;
+    slides[current].classList.add('active');
+    document.getElementById('current').textContent = current + 1;
+  }
+
+  document.getElementById('prev').addEventListener('click', () => show(current - 1));
+  document.getElementById('next').addEventListener('click', () => show(current + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault(); show(current + 1);
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault(); show(current - 1);
+    }
+  });
+</script>
+
+</body>
+</html>

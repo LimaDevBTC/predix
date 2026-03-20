@@ -142,7 +142,7 @@ const SCAN_PAGE_SIZE = 50
 const MAX_PAGES_PER_SCAN = 20
 const MIN_SCAN_INTERVAL_MS = 30_000
 const FETCH_TIMEOUT = 12_000
-const REDIS_CACHE_KEY = 'indexer:cache:v2'
+const REDIS_CACHE_KEY = 'indexer:cache:v3'
 const REDIS_CACHE_TTL = 3600 // 1 hour
 
 function getContractAddress(): string {
@@ -288,6 +288,15 @@ function parseClaimTx(tx: HiroTx): { roundId: number; priceStart: number; priceE
       roundId: parseUint(args[1].repr),
       priceStart: parseUint(args[3].repr),
       priceEnd: parseUint(args[4].repr),
+    }
+  }
+
+  if (fn === 'resolve-and-distribute' && args.length >= 3) {
+    // predixv8/gatewayv7: (round-id, price-start, price-end)
+    return {
+      roundId: parseUint(args[0].repr),
+      priceStart: parseUint(args[1].repr),
+      priceEnd: parseUint(args[2].repr),
     }
   }
 
@@ -578,7 +587,7 @@ async function scanAddress(address: string): Promise<number> {
         knownTxIds.add(tx.tx_id)
       }
 
-      if (fn === 'claim-round' || fn === 'claim-round-side' || fn === 'resolve-round' || fn === 'claim-on-behalf') {
+      if (fn === 'claim-round' || fn === 'claim-round-side' || fn === 'resolve-round' || fn === 'claim-on-behalf' || fn === 'resolve-and-distribute') {
         // Always mark as known regardless of status
         knownTxIds.add(tx.tx_id)
         if (tx.tx_status === 'success') {
